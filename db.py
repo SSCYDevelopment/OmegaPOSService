@@ -383,3 +383,99 @@ def CleanCartPayment(TransDate, Shop, Crid, CartID):
 
     except Exception as e:
         raise e
+
+
+
+def GetPaymentType(lcMakt: str, lcMemberDate: str = 'N'):
+    """Call stored procedure MPos_Crm01_GetPaymentType and return rows as list[dict].
+
+    Parameters:
+    - lcMakt: market code (char(2))
+    - lcMemberDate: 'Y' or 'N' (char(1)), default 'N'
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_Crm01_GetPaymentType ?, ?"
+
+        try:
+            cursor.execute(sql, (lcMakt, lcMemberDate))
+        except Exception as sql_ex:
+            logging.error(f"SQL Execute Error: {sql} | Params: {lcMakt}, {lcMemberDate} | Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        columns = [col[0] for col in cursor.description] if cursor.description else []
+        rows = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        return [dict(zip(columns, row)) for row in rows]
+
+    except Exception as e:
+        raise e
+
+
+def GetSuspend(TransDate: str, Shop: str, Crid: str):
+    """Call stored procedure MPos_crm01_GetSuspend and return suspended carts.
+
+    Parameters:
+    - TransDate: smalldatetime (string ISO format recommended)
+    - Shop: char(5)
+    - Crid: char(3)
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_crm01_GetSuspend ?, ?, ?"
+
+        try:
+            cursor.execute(sql, (TransDate, Shop, Crid))
+        except Exception as sql_ex:
+            logging.error(f"SQL Execute Error: {sql} | Params: {TransDate}, {Shop}, {Crid} | Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        columns = [col[0] for col in cursor.description] if cursor.description else []
+        rows = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        return [dict(zip(columns, row)) for row in rows]
+
+    except Exception as e:
+        raise e
+
+
+def CheckStyl(pcSkun: str, pcMakt: str = '', pcShop: str = ''):
+    """Call stored procedure MPos_CheckStyl and return matching style info.
+
+    Parameters:
+    - pcSkun: sku barcode/string (varchar(21))
+    - pcMakt: market code (char(2)), optional
+    - pcShop: shop code (char(5)), optional
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_CheckStyl ?, ?, ?"
+
+        try:
+            cursor.execute(sql, (pcSkun, pcMakt, pcShop))
+        except Exception as sql_ex:
+            logging.error(f"SQL Execute Error: {sql} | Params: {pcSkun}, {pcMakt}, {pcShop} | Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        columns = [col[0] for col in cursor.description] if cursor.description else []
+        rows = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        return [dict(zip(columns, row)) for row in rows]
+
+    except Exception as e:
+        raise e

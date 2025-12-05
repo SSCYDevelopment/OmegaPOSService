@@ -8,8 +8,10 @@ from db import DeleteCartItem
 from db import GetCartItems
 from db import SaveCartItem
 from db import SaveCartPayment
-from db import CleanCartPayment
 from db import SaveCartInfo
+from db import GetPaymentType
+from db import GetSuspend
+from db import CheckStyl
 
 
 app = FastAPI()
@@ -89,9 +91,9 @@ def api_save_cart_item(
     qty: int = Query(..., description="数量（int），当前行项的商品数量"),
     Weight: float = Query(..., description="重量（money），前端传 float 即可，单位按系统约定"),
     Price: float = Query(..., description="单价（money）"),
-    OPrice: float = Query(..., description="原价（money），销售前的原始单价"),
+    UnitPrice: float = Query(..., description="原价（money），销售前的原始单价"),
     Amnt: float = Query(..., description="金额（money），行项目实际金额（含折扣后的金额）"),
-    OAmnt: float = Query(..., description="原价金额合计（money），按原价计算的金额合计"),
+    UnitPriceAmnt: float = Query(..., description="原价金额合计（money），按原价计算的金额合计"),
     Discount: float = Query(..., description="折扣（money），折扣金额或折扣值，按系统约定"),
     DiscountType: str = Query(..., description="折扣类型（char(1)），表示折扣方式/类别的代码"),
     DiscountID: str = Query(..., description="折扣代码（varchar(20)），对应的折扣标识"),
@@ -104,8 +106,8 @@ def api_save_cart_item(
     SaleType: str = Query("", description="销售子类型（char(1)，可选）"),
     Line: str = Query("", description="系列/线路代码（char(3)，可选）"),
     Brand: str = Query("", description="品牌代码（char(3)，可选）"),
-    Cate: str = Query("", description="类别代码（char(2)，可选）"),
-    Ptype: str = Query("", description="商品类型（char(1)，可选）"),
+    Category: str = Query("", description="类别代码（char(2)，可选）"),
+    Ptype: str = Query("", description="销售类型（char(1)），表示卖/退 等代码，可选"),        
     Calced: str = Query("", description="是否已计算标志（char(1)，可选），表示是否已完成某类计算"),
     Commision: float = Query(0, description="佣金（money），行项目的佣金金额，默认 0"),
     GPrice: float = Query(0, description="GPrice（money），内部价格字段，默认 0"),
@@ -131,9 +133,9 @@ def api_save_cart_item(
         qty,
         Weight,
         Price,
-        OPrice,
+        UnitPrice,
         Amnt,
-        OAmnt,
+        UnitPriceAmnt,
         Discount,
         DiscountType,
         DiscountID,
@@ -146,7 +148,7 @@ def api_save_cart_item(
         SaleType,
         Line,
         Brand,
-        Cate,
+        Category,
         Ptype,
         Calced,
         Commision,
@@ -200,7 +202,7 @@ def api_save_cart_info(
 
 
 ## 保存/更新支付信息（调用存储过程 MPos_Crm01_SavePayment）
-@app.get("/save-cart-payment")
+@app.get("/save-payment")
 def api_save_payment(
     TransDate: str = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式，例如 2025-12-01"),
     Shop: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
@@ -233,13 +235,60 @@ def api_save_payment(
     return {"success": True, "result": result}
 
 
-## 清除购物车支付信息（调用存储过程 MPos_Crm01_CleanCartPayment）
-@app.get("/clean-cart-payment")
-def api_clean_cart_payment(
-    TransDate: str = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式，例如 2025-12-01"),
+## 获取可用支付方式（调用存储过程 MPos_Crm01_GetPaymentType）
+@app.get("/payment-types")
+def api_get_payment_types(
+    lcMakt: str = Query(..., description="市场/货币代码（char(2)），例如系统中使用的市场代码"),
+    lcMemberDate: str = Query('N', description="是否仅显示会员近期方式（char(1)，'Y' 或 'N'，默认 'N'）"),
+):
+    data = GetPaymentType(lcMakt, lcMemberDate)
+    if data is None:
+        count = 0
+    elif isinstance(data, (list, tuple, set, dict)):
+        count = len(data)
+    else:
+        try:
+            count = len(data)
+        except Exception:
+            count = 1
+    return {"success": True, "count": count, "data": data}
+
+
+## 获取挂起购物车列表（调用存储过程 MPos_crm01_GetSuspend）
+@app.get("/suspend-list")
+def api_get_suspend_list(
+    TransDate: str = Query(..., description="交易日期（smalldatetime），建议 ISO 格式，例如 2025-12-01"),
     Shop: str = Query(..., description="店铺代码（char(5)，5 字符店铺编号"),
     Crid: str = Query(..., description="收银机号（char(3)，3 字符收银机/柜台编号"),
-    CartID: str = Query(..., description="购物车 ID（uniqueidentifier），UUID 字符串"),
 ):
-    result = CleanCartPayment(TransDate, Shop, Crid, CartID)
-    return {"success": True, "result": result}
+    data = GetSuspend(TransDate, Shop, Crid)
+    if data is None:
+        count = 0
+    elif isinstance(data, (list, tuple, set, dict)):
+        count = len(data)
+    else:
+        try:
+            count = len(data)
+        except Exception:
+            count = 1
+    return {"success": True, "count": count, "data": data}
+
+
+## 检查货号/款号信息（调用存储过程 MPos_CheckStyl）
+@app.get("/check-styl")
+def api_check_styl(
+    pcSkun: str = Query(..., description="SKU 字符串/条形码（varchar(21)），例如完整 SKU 或部分码"),
+    pcMakt: str = Query('', description="市场代码（char(2)，可选，默认空字符串）"),
+    pcShop: str = Query('', description="店铺代码（char(5)，可选，默认空字符串）"),
+):
+    data = CheckStyl(pcSkun, pcMakt, pcShop)
+    if data is None:
+        count = 0
+    elif isinstance(data, (list, tuple, set, dict)):
+        count = len(data)
+    else:
+        try:
+            count = len(data)
+        except Exception:
+            count = 1
+    return {"success": True, "count": count, "data": data}
