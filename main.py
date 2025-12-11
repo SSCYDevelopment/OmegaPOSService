@@ -12,6 +12,8 @@ from db import SaveCartInfo
 from db import GetPaymentType
 from db import GetSuspend
 from db import CheckStyl
+from db import SyncSaveStyle
+from db import SyncSaveSku
 
 
 app = FastAPI()
@@ -282,6 +284,48 @@ def api_check_styl(
     pcShop: str = Query('', description="店铺代码（char(5)，可选，默认空字符串）"),
 ):
     data = CheckStyl(pcSkun, pcMakt, pcShop)
+    if data is None:
+        count = 0
+    elif isinstance(data, (list, tuple, set, dict)):
+        count = len(data)
+    else:
+        try:
+            count = len(data)
+        except Exception:
+            count = 1
+    return {"success": True, "count": count, "data": data}
+
+
+## 同步保存/更新款式信息（调用存储过程 MPos_Sync_SaveStyle）
+@app.get("/sync-save-style")
+def api_sync_save_style(
+    styleID: str = Query(..., description="款号/货号（varchar(15)），款式编号"),
+    localName: str = Query(..., description="本地名称（nvarchar(100)），款式的本地语言名称"),
+    englishName: str = Query(..., description="英文名称（nvarchar(100)），款式的英文名称"),
+    brand: str = Query(..., description="品牌代码（varchar(15)），品牌编号"),
+    unitPrice: float = Query(..., description="单价（smallmoney），款式的单价"),
+):
+    data = SyncSaveStyle(styleID, localName, englishName, brand, unitPrice)
+    if data is None:
+        count = 0
+    elif isinstance(data, (list, tuple, set, dict)):
+        count = len(data)
+    else:
+        try:
+            count = len(data)
+        except Exception:
+            count = 1
+    return {"success": True, "count": count, "data": data}
+
+## 同步保存 SKU 信息（调用存储过程 MPos_Sync_SaveSku）
+@app.get("/sync-save-sku")
+def api_sync_save_sku(
+    barcode: str = Query(..., description="条码（varchar(50)），SKU 条形码"),
+    styleID: str = Query(..., description="款号/货号（varchar(15)），款式编号"),
+    colorID: str = Query(..., description="颜色代码（char(3)），颜色标识码"),
+    sizeID: str = Query(..., description="尺码代码（char(3)），尺码标识"),
+):
+    data = SyncSaveSku(barcode, styleID, colorID, sizeID)
     if data is None:
         count = 0
     elif isinstance(data, (list, tuple, set, dict)):

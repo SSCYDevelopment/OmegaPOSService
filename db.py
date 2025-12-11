@@ -479,3 +479,77 @@ def CheckStyl(pcSkun: str, pcMakt: str = '', pcShop: str = ''):
 
     except Exception as e:
         raise e
+
+
+
+def SyncSaveStyle(styleID: str, localName: str, englishName: str, brand: str, unitPrice: float):
+    """同步保存或更新款式信息（调用存储过程 MPos_Sync_SaveStyle）。
+
+    参数：
+    - styleID: 款式编号 (varchar(15))
+    - localName: 本地语言名称 (nvarchar(100))
+    - englishName: 英文名称 (nvarchar(100))
+    - brand: 品牌代码 (varchar(15))
+    - unitPrice: 单价 (smallmoney)
+
+    返回：
+    - 存储过程返回的记录列表（list[dict]），若无返回则为 []。
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_Sync_SaveStyle ?, ?, ?, ?, ?"
+
+        try:
+            cursor.execute(sql, (styleID, localName, englishName, brand, unitPrice))
+        except Exception as sql_ex:
+            logging.error(f"SQL Execute Error: {sql} | Params: {styleID}, {localName}, {englishName}, {brand}, {unitPrice} | Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        columns = [col[0] for col in cursor.description] if cursor.description else []
+        rows = cursor.fetchall()
+
+        cursor.close()
+        conn.commit()
+        conn.close()
+
+        return [dict(zip(columns, row)) for row in rows]
+
+    except Exception as e:
+        logging.error(f"SQL Execute Error: {sql} | Params: {styleID}, {localName}, {englishName}, {brand}, {unitPrice} | Error: {str(e)}")
+        raise Exception("SQL 执行错误，请联系系统管理员")
+
+
+def SyncSaveSku(barcode: str, styleID: str, colorID: str, sizeID: str):
+    """Call stored procedure MPos_Sync_SaveSku to save SKU information.
+
+    Parameters:
+    - barcode: barcode (varchar(50))
+    - styleID: style ID (varchar(15))
+    - colorID: color ID (char(3))
+    - sizeID: size ID (char(3))
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_Sync_SaveSku ?, ?, ?, ?"
+
+        try:
+            cursor.execute(sql, (barcode, styleID, colorID, sizeID))
+        except Exception as sql_ex:
+            logging.error(f"SQL Execute Error: {sql} | Params: {barcode}, {styleID}, {colorID}, {sizeID} | Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        columns = [col[0] for col in cursor.description] if cursor.description else []
+        rows = cursor.fetchall()
+
+        cursor.close()
+        conn.commit()
+        conn.close()
+
+        return [dict(zip(columns, row)) for row in rows]
+
+    except Exception as e:
+        raise e
