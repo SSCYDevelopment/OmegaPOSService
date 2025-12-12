@@ -600,6 +600,8 @@ def SyncSaveStyle(styleID: str, localName: str, englishName: str, brand: str, un
     返回：
     - 存储过程返回的记录列表（list[dict]），若无返回则为 []。
     """
+    conn = None
+    cursor = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -618,13 +620,13 @@ def SyncSaveStyle(styleID: str, localName: str, englishName: str, brand: str, un
         cursor.close()
         conn.commit()
         conn.close()
-
         return [dict(zip(columns, row)) for row in rows]
 
     except Exception as e:
         logging.error(f"SQL Execute Error: {sql} | Params: {styleID}, {localName}, {englishName}, {brand}, {unitPrice} | Error: {str(e)}")
+        conn.rollback()
         raise Exception("SQL 执行错误，请联系系统管理员")
-
+            
 
 def SyncSaveSku(barcode: str, styleID: str, colorID: str, sizeID: str):
     """Call stored procedure MPos_Sync_SaveSku to save SKU information.
@@ -635,6 +637,8 @@ def SyncSaveSku(barcode: str, styleID: str, colorID: str, sizeID: str):
     - colorID: color ID (char(3))
     - sizeID: size ID (char(3))
     """
+    conn = None
+    cursor = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -657,6 +661,7 @@ def SyncSaveSku(barcode: str, styleID: str, colorID: str, sizeID: str):
         return [dict(zip(columns, row)) for row in rows]
 
     except Exception as e:
+        conn.rollback()
         raise e
 
 
