@@ -21,7 +21,7 @@ from db import SyncSaveStyle
 from db import GetShift
 from db import SyncSaveSku
 from db import SyncSavePrice
-
+import uvicorn
 
 app = FastAPI()
 
@@ -443,3 +443,6 @@ def api_sync_save_price(
         except Exception:
             count = 1
     return {"success": True, "count": count, "data": data}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8081)
