@@ -392,6 +392,7 @@ CREATE TABLE [dbo].[crpomh]
     [phtdat] SMALLDATETIME NOT NULL, 
     [phvrgn] CHAR(3) NOT NULL, 
     [phcanx] CHAR NOT NULL, 
+    [phvlmt] CHAR NOT NULL DEFAULT '',
     PRIMARY KEY ([phshop], [phtxnt])
 )
 
@@ -718,3 +719,38 @@ create table cccard (cdcard char(10),
 Go
 
 
+/*
+--**--
+* @name: crpmct
+* @category: Table
+* @setion: VIP
+* @type:
+* @purpose: 推广活动对VIP客人的限制（店铺表）
+* @parameter: pcpomo promotion ID
+* @parameter: pccust 顾客号
+--**--
+*/
+Create Table crpmct (pcpomo char(12),
+                     pccust char(10),
+                     Primary Key Clustered(pcpomo,pccust)
+                    )
+Go
+
+/*
+--**--
+*  @name: crscop
+*  @category: Table
+*  @section: VIP
+*  @type: 設定
+*  @purpose: VIP促销活动适用的款式范围
+*  @parameter: scscop 款式范围编号
+*  @parameter: scstyl 款式
+*  @parameter: scstyp 吻合类型
+*/
+CREATE TABLE [dbo].[crscop]
+(
+	[scscop] CHAR(12) NOT NULL , 
+    [scstyl] VARCHAR(50) NOT NULL, 
+    [scstyp] CHAR(1) NULL DEFAULT '', 
+    PRIMARY KEY ([scscop], [scstyl])
+)
