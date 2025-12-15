@@ -1,6 +1,6 @@
-DROP PROCEDURE dbo.MPos_ChangeTrandate
+DROP PROCEDURE dbo.MPos_Public_ChangeTrandate
 GO
-CREATE proc  MPos_ChangeTrandate @shop CHAR(5)  
+CREATE proc  MPos_Public_ChangeTrandate @shop CHAR(5)  
 as  
 
 declare @ldTxdt smalldatetime  

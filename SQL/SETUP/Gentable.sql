@@ -458,14 +458,6 @@ GO
 Create Table sydate (sdtxdt smalldatetime)
 GO
 
-INSERT dbo.sydate
-(
-    sdtxdt
-)
-VALUES
-( '2025-12-04'
-    )
-
 /*
 --**--
 *  @name: mfprch
@@ -724,3 +716,5 @@ create table cccard (cdcard char(10),
                      Foreign Key (cdregn,cdlevl) References crlevl(lvregn,lvlevl)
                     )
 Go
+
+
