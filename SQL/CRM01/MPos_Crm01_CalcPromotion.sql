@@ -7,32 +7,33 @@ CREATE PROCEDURE EPOS_Crm01_CalcCompaign @shopID CHAR(5),
 	@memberCard CHAR(10) = '',
 	@debug CHAR(1) = 'N'
 AS
-DECLARE @wwsRegion CHAR(3)
+DECLARE @memberRegion CHAR(3)
 
-SET @wwsRegion = ''
+
+SET @memberRegion = ''
 
 IF (rtrim(@memberCard) <> '')
 BEGIN
-	SELECT @wwsRegion = cdregn
+	SELECT @memberRegion = cdregn
 	FROM cccard(NOLOCK)
 	WHERE cdcard = @memberCard
 
-	IF @wwsRegion IS NULL
-		SET @wwsRegion = ''
+	IF @memberRegion IS NULL
+		SET @memberRegion = ''
 END
 
 IF @memberCard IS NULL
 	SET @memberCard = ''
 
-DECLARE @WWSCustID CHAR(10)
+DECLARE @memberCustID CHAR(10)
 
 IF (rtrim(@memberCard) <> '')
-	SELECT @WWSCustID = cdcust
+	SELECT @memberCustID = cdcust
 	FROM cccard(NOLOCK)
 	WHERE cdcard = @memberCard
 
-IF @WWSCustID IS NULL
-	SET @WWSCustID = ''
+IF @memberCustID IS NULL
+	SET @memberCustID = ''
 
 DECLARE @sysDate SMALLDATETIME
 
@@ -65,10 +66,10 @@ CREATE TABLE #crcart (
 	[InputTime] SMALLDATETIME,
 	[Seqn] INT,
 	[ItemType] CHAR(1),
-	[Sku] CHAR(15),
-	[StyleCode] CHAR(11),
-	[Color] CHAR(2),
-	[Size] CHAR(2),
+	[Sku] CHAR(21),
+	[StyleCode] CHAR(15),
+	[Color] CHAR(3),
+	[Size] CHAR(3),
 	[Price] MONEY,
 	[Discount] MONEY,
 	[Qty] INT,
@@ -83,7 +84,7 @@ CREATE TABLE #crcart (
 	[Brand] CHAR(3),
 	[Cate] CHAR(2),
 	[Ptype] CHAR(1),
-	[Weight] MONEY,
+	[DMark] MONEY,
 	[Commision] MONEY,
 	[PromotionID] VARCHAR(20),
 	[DiscountID] VARCHAR(20),
@@ -165,21 +166,26 @@ FROM crpomh(NOLOCK)
 WHERE phshop = @shopID
 	AND (
 		phvrgn = ''
-		OR phvrgn = @wwsRegion
+		OR phvrgn = @memberRegion
 		)
 	AND phcanx <> 'Y'
 	AND phfdat <= @sysDate
 	AND @sysDate <= phtdat
 ORDER BY Phtxnt DESC
 
+
+--去除只有会员限定的促销活动
 DELETE
 FROM #tpomh
 FROM crpomh(NOLOCK)
 WHERE phshop = @shopID
 	AND phtxnt = tphtxnt
 	AND phvlmt = 'Y'
-	AND @wwsCard = ''
+	AND @memberCard = ''
 
+
+
+--去除只有指定某会员限定的促销活动
 DELETE
 FROM #tpomh
 FROM crpomh(NOLOCK)
@@ -190,7 +196,7 @@ WHERE phshop = @shopID
 		SELECT *
 		FROM crpmct(NOLOCK)
 		WHERE pcpomo = phtxnt
-			AND pccust = @WWSCustID
+			AND pccust = @memberCustID
 		)
 
 IF (@debug = 'Y')
@@ -550,6 +556,7 @@ SET Price = PPrice,
 	DiscountPtyp = ''
 WHERE Change <> 'Y'
 	AND PromotionID <> ''
+
 
 INSERT #crcart (
 	[InputTime],
