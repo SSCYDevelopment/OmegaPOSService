@@ -241,10 +241,12 @@ SELECT * FROM syconf
 GO
 DELETE FROM syconf
 go
-INSERT syconf(cnshop,cnprop,cnvalu)
-VALUES('GZ86','ECOMPANY','SANSE LTD.')
-INSERT syconf(cnshop,cnprop,cnvalu)
-VALUES('GZ86','LCOMPANY','盛世长运（广东）控股有限公司')
+
+INSERT syconf (cnshop,cnprop,cnvalu)VALUES ('GZ86','ECOMPANY',	'SANSE LTD.')
+INSERT syconf (cnshop,cnprop,cnvalu)VALUES ('GZ86','LCOMPANY','盛世长运（广东）控股有限公司')
+INSERT syconf (cnshop,cnprop,cnvalu)VALUES ('GZ86','VATRATE','1.13')
+INSERT syconf(cnshop,cnprop,cnvalu) VALUES('GZ86','TDECIMAL','2')           
+
 
 GO
 /* current shop*/

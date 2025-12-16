@@ -754,3 +754,24 @@ CREATE TABLE [dbo].[crscop]
     [scstyp] CHAR(1) NULL DEFAULT '', 
     PRIMARY KEY ([scscop], [scstyl])
 )
+
+
+/*
+--**--
+*  @name: syproc
+*  @category: Table
+*  @section: System
+*  @type: Process
+*  @purpose: 等待处理的数据
+*  @parameter: prshop 店铺
+*  @parameter: prtype 数据类型
+*  @parameter: prtxnt 数据参数
+--**--
+*/
+--CRSAL,CRVOD.SKADJ,SKIHI,SKIHO,SKOHI,SKOHO,SKTAK,WCOST
+Create Table syproc 
+    (prshop char(5),
+     prtype char(5),
+     prtxnt char(40),
+     primary key clustered (prshop, prtype, prtxnt))
+Go

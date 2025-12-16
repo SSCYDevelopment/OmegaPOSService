@@ -1,19 +1,16 @@
 DROP PROC MPos_Crm01_Update
-
 go
-
 CREATE PROCEDURE MPos_Crm01_Update
-  @pcShop      char(5),
-  @pdTxdt      smalldatetime,
-  @pcCrid      char(3),
-  @pnInvo      int,
-  @pmDiscAmt   money=0,
-  @pmRedeemAmt money=0,
-  @pcPromId    nvarchar(200)='',
-  @pnRedeemQty smallint=0
+  @shopID      char(5),
+  @TransDate      smalldatetime,
+  @crid      char(3),
+  @invoiceID      int,
+  @discountAmount   money=0,
+  @redeemAmount money=0, --预留
+  @redeemQuantity smallint=0 --预留
 AS
     DECLARE @lmCamt money
-    DECLARE @lmIamt money
+    DECLARE @lmIamt money --货品总金额
     DECLARE @lnShft int
     DECLARE @lcMakt char(2)
     DECLARE @lnVatr decimal(5, 2)
@@ -39,10 +36,10 @@ AS
     DECLARE @lnError int
     DECLARE @lcPara char(40)
 
-    SELECT @lcPara = CONVERT(char(8), @pdTxdt, 112) + '  ' + @pcshop
-                     + @pcCrid + CONVERT(char(5), @pnInvo)
+    SELECT @lcPara = CONVERT(char(8), @TransDate, 112) + '  ' + @shopID
+                     + @crid + CONVERT(char(5), @invoiceID)
 
-    --????coupon      
+    --计算能抵扣货款的coupon      
     DECLARE @lnXCouponSum money
     DECLARE @lnXCrsaldSum money
     DECLARE @lnXShareSum money
@@ -58,58 +55,62 @@ AS
 
     SELECT @lcMakt = shmakt
     FROM   mfshop(nolock)
-    WHERE  shshop = @pcShop
+    WHERE  shshop = @shopID
 
     SELECT @lnVatr = CONVERT(decimal(5, 2), cnvalu)
     FROM   syconf
-    WHERE  cnshop = @pcShop AND
+    WHERE  cnshop = @shopID AND
            rtrim(cnprop) = 'VATRATE'
+
 
     SELECT @lnDEC = CASE
                       WHEN cnvalu = '' THEN 2
                       ELSE CONVERT(smallint, cnvalu)
                     END
     FROM   syconf
-    WHERE  cnshop = @pcShop AND
+    WHERE  cnshop = @shopID AND
            rtrim(cnprop) = 'TDECIMAL'
 
+    --获取货品总金额
     SELECT @lmIamt = sum(CASE
                            WHEN sdtype = 'S' THEN sdtqty * sdsprc - sddsct
                            ELSE sddsct - sdtqty * sdsprc
                          END)
     FROM   crsald
-    WHERE  sdshop = @pcShop AND
-           sdtxdt = @pdTxdt AND
-           sdcrid = @pcCrid AND
-           sdinvo = @pnInvo
+    WHERE  sdshop = @shopID AND
+           sdtxdt = @TransDate AND
+           sdcrid = @crid AND
+           sdinvo = @invoiceID
 
+    --获取支付方式总金额
     SELECT @lmCamt = sum(ctlamt)
     FROM   crctdr
-    WHERE  ctshop = @pcShop AND
-           cttxdt = @pdTxdt AND
-           ctcrid = @pcCrid AND
-           ctinvo = @pnInvo
+    WHERE  ctshop = @shopID AND
+           cttxdt = @TransDate AND
+           ctcrid = @crid AND
+           ctinvo = @invoiceID
 
+    --获取当前更次
     SELECT @lnShft = dhshft
     FROM   crcdwh
-    WHERE  dhtxdt = @pdtxdt AND
-           dhshop = @pcShop AND
-           dhcrid = @pcCrid AND
-           dhfinv <= @pnInvo AND
-           dhtinv >= @pnInvo
-
+    WHERE  dhtxdt = @TransDate AND
+           dhshop = @shopID AND
+           dhcrid = @crid AND
+           dhfinv <= @invoiceID AND
+           dhtinv >= @invoiceID
+    --若未获取到更次，则取当天第一笔交易的更次
     IF @lnShft IS NULL
       SELECT @lnShft = dhshft
       FROM   crcdwh
-      WHERE  dhtxdt = @pdtxdt AND
-             dhshop = @pcShop AND
-             dhcrid = @pcCrid AND
+      WHERE  dhtxdt = @TransDate AND
+             dhshop = @shopID AND
+             dhcrid = @crid AND
              rtrim(dhclrf) = ''
 
     IF @lmCamt IS NULL
       SET @lmCamt = 0
 
-    SET @lmCamt = @lmCamt + @pmDiscAmt
+    SET @lmCamt = @lmCamt + @discountAmount
     SET @lcMeed = 'N'
 
     IF @lmCamt = @lmIamt  OR
@@ -123,73 +124,74 @@ AS
 
           BEGIN TRANSACTION
 
+          --计算能抵扣货款的coupon
           SELECT @lnXCouponSum = sum(ctlamt)
           FROM   crctdr,mftdrt
           WHERE  cttdrt = tdtdrt AND
                  ctmakt = tdmakt AND
-                 ctshop = @pcShop AND
-                 cttxdt = @pdTxdt AND
-                 ctcrid = @pcCrid AND
-                 ctinvo = @pnInvo AND
+                 ctshop = @shopID AND
+                 cttxdt = @TransDate AND
+                 ctcrid = @crid AND
+                 ctinvo = @invoiceID AND
                  tdtype&1 = 1
 
           IF @lnXCouponSum IS NULL
             SET @lnXCouponSum = 0
 
-          SET @lnXCouponSum = @lnXCouponSum + @pmDiscAmt
+          SET @lnXCouponSum = @lnXCouponSum + @discountAmount
 
           IF @lnXCouponSum > 0
             BEGIN
                 SELECT @lnXCrsaldSum = sum(sdsprc * sdtqty - sddsct)
                 FROM   crsald
-                WHERE  sdshop = @pcShop AND
-                       sdtxdt = @pdTxdt AND
-                       sdcrid = @pcCrid AND
-                       sdinvo = @pnInvo AND
+                WHERE  sdshop = @shopID AND
+                       sdtxdt = @TransDate AND
+                       sdcrid = @crid AND
+                       sdinvo = @invoiceID AND
                        sdtype = 'S'
 
                 SELECT @lnXShareSum = sum(floor(( ( sdsprc * sdtqty - sddsct ) / @lnXCrsaldSum ) * @lnXCouponSum))
                 FROM   crsald
-                WHERE  sdshop = @pcShop AND
-                       sdtxdt = @pdTxdt AND
-                       sdcrid = @pcCrid AND
-                       sdinvo = @pnInvo AND
+                WHERE  sdshop = @shopID AND
+                       sdtxdt = @TransDate AND
+                       sdcrid = @crid AND
+                       sdinvo = @invoiceID AND
                        sdtype = 'S'
 
                 UPDATE crsald
                 SET    sddsct = sddsct
                                 + floor(((sdsprc*sdtqty-sddsct)/@lnXCrsaldSum) * @lnXCouponSum)
-                WHERE  sdshop = @pcShop AND
-                       sdtxdt = @pdTxdt AND
-                       sdcrid = @pcCrid AND
-                       sdinvo = @pnInvo AND
+                WHERE  sdshop = @shopID AND
+                       sdtxdt = @TransDate AND
+                       sdcrid = @crid AND
+                       sdinvo = @invoiceID AND
                        sdtype = 'S'
 
                 IF @lnXShareSum <> @lnXCouponSum
                   BEGIN
                       SELECT @lnXCrsaldMaxAmnt = max(sdsprc * sdtqty - sddsct)
                       FROM   crsald
-                      WHERE  sdshop = @pcShop AND
-                             sdtxdt = @pdTxdt AND
-                             sdcrid = @pcCrid AND
-                             sdinvo = @pnInvo AND
+                      WHERE  sdshop = @shopID AND
+                             sdtxdt = @TransDate AND
+                             sdcrid = @crid AND
+                             sdinvo = @invoiceID AND
                              sdtype = 'S'
 
                       SELECT @lnXCrsaldMaxAmntSeqn = sdseqn
                       FROM   crsald
-                      WHERE  sdshop = @pcShop AND
-                             sdtxdt = @pdTxdt AND
-                             sdcrid = @pcCrid AND
-                             sdinvo = @pnInvo AND
+                      WHERE  sdshop = @shopID AND
+                             sdtxdt = @TransDate AND
+                             sdcrid = @crid AND
+                             sdinvo = @invoiceID AND
                              sdtype = 'S' AND
                              ( sdsprc * sdtqty - sddsct ) = @lnXCrsaldMaxAmnt
 
                       UPDATE crsald
                       SET    sddsct = sddsct + ( @lnXCouponSum - @lnXShareSum )
-                      WHERE  sdshop = @pcShop AND
-                             sdtxdt = @pdTxdt AND
-                             sdcrid = @pcCrid AND
-                             sdinvo = @pnInvo AND
+                      WHERE  sdshop = @shopID AND
+                             sdtxdt = @TransDate AND
+                             sdcrid = @crid AND
+                             sdinvo = @invoiceID AND
                              sdtype = 'S' AND
                              sdseqn = @lnXCrsaldMaxAmntSeqn
                   END
@@ -197,11 +199,10 @@ AS
                 IF @lnVatr > 0
                   UPDATE crsald
                   SET    sdvata = ( sdsprc * sdtqty - sddsct ) * @lnVatr / ( 1 + @lnVatr )
-                  WHERE  sdshop = @pcShop AND
-                         sdtxdt = @pdTxdt AND
-                         sdcrid = @pcCrid AND
-                         sdinvo = @pnInvo
-
+                  WHERE  sdshop = @shopID AND
+                         sdtxdt = @TransDate AND
+                         sdcrid = @crid AND
+                         sdinvo = @invoiceID
             /*      
                            delete from crctdr      
                               from mftdrt      
@@ -209,107 +210,7 @@ AS
                                     ctmakt=@lcMakt and ctmakt=tdmakt and cttdrt=tdtdrt and tdtype & 1 = 1   
             */
                 --????????  
-                IF EXISTS( SELECT *
-                           FROM   crctdr
-                           WHERE  ctshop = @pcShop AND
-                                  cttxdt = @pdTxdt AND
-                                  ctcrid = @pcCrid AND
-                                  ctinvo = @pnInvo ) AND
-                   EXISTS( SELECT *
-                           FROM   crprop
-                           WHERE  cpshop = @pcShop AND
-                                  cptxdt = @pdTxdt AND
-                                  cpcrid = @pcCrid AND
-                                  cpinvo = @pnInvo AND
-                                  cpprop = 'RODSkunLST' AND
-                                  cpvalu IS NOT NULL AND
-                                  RTRIM(cpvalu) <> '' )
-                  BEGIN
-                      DECLARE @remoteOrderSkuList nvarchar(2000)
 
-                      SELECT @remoteOrderSkuList = RTRIM(cpvalu)
-                      FROM   crprop(nolock)
-                      WHERE  cpshop = @pcShop AND
-                             cptxdt = @pdTxdt AND
-                             cpcrid = @pcCrid AND
-                             cpinvo = @pnInvo AND
-                             cpprop = 'RODSkunLST'
-
-                      DECLARE @loop int
-                      DECLARE @remoteOrderItems TABLE
-                      (
-                         SkunId char( 15 ),
-                         Qty    smallint,
-                         Amount smallmoney
-                      )
-
-                      SET @loop = 0
-
-                      WHILE EXISTS( SELECT *
-                                    FROM   fn_SplitStrEx(@remoteOrderSkuList, ';')
-                                    WHERE  row = @loop )
-                        BEGIN
-                            DECLARE @item varchar(100)
-
-                            SET @item = ''
-
-                            SELECT @item = col
-                            FROM   fn_SplitStrEx(@remoteOrderSkuList, ';')
-                            WHERE  row = @loop
-
-                            DECLARE @skunID char(15)
-                            DECLARE @qty smallint
-                            DECLARE @amount smallmoney
-
-                            SELECT @skunID = col
-                            FROM   fn_SplitStrEx(@item, ',')
-                            WHERE  row = 0
-
-                            SELECT @qty = CONVERT(smallint, col)
-                            FROM   fn_SplitStrEx(@item, ',')
-                            WHERE  row = 1
-
-                            SELECT @amount = CONVERT(smallmoney, col)
-                            FROM   fn_SplitStrEx(@item, ',')
-                            WHERE  row = 2
-
-                            INSERT @remoteOrderItems
-                            VALUES(@skunID,@qty,@amount)
-
-                            SET @loop = @loop + 1
-                        END
-
-                      UPDATE @remoteOrderItems
-                      SET    Amount = ( ( sdsprc * sdtqty - sddsct ) / sdtqty ) * Qty
-                      FROM   crsald
-                      WHERE  sdshop = @pcShop AND
-                             sdtxdt = @pdTxdt AND
-                             sdcrid = @pcCrid AND
-                             sdinvo = @pnInvo AND
-                             sdskun = SkunId AND
-                             sdtype = 'S' AND
-                             sdtqty > 0
-
-                      DECLARE @RODSkunList varchar(4000)
-
-                      SET @RODSkunList = ''
-
-                      SELECT @RODSkunList = @RODSkunList + SkunID + ','
-                                            + ltrim(rtrim(CONVERT(varchar, Qty))) + ','
-                                            + LTRIM(rtrim(CONVERT(varchar, amount))) + ';'
-                      FROM   @remoteOrderItems
-
-                      IF LEN(rtrim(@RODSkunList)) > 0
-                        SET @RODSkunList = LEFT(@RODSkunList, LEN(RTRIM(@RODSkunList)) - 1)
-
-                      UPDATE crprop
-                      SET    cpvalu = @RODSkunList
-                      WHERE  cpshop = @pcShop AND
-                             cptxdt = @pdTxdt AND
-                             cpcrid = @pcCrid AND
-                             cpinvo = @pnInvo AND
-                             cpprop = 'RODSkunLST'
-                  END
             END
 
           IF @lnVatr < 0
@@ -317,10 +218,10 @@ AS
             SET    sdvata = ( sdsprc * sdtqty - sddsct ) * ( 0 - @lnVatr ),
                    sdsprc = sdsprc * ( 1 - @lnVatr ),
                    sddsct = sddsct * ( 1 - @lnVatr )
-            WHERE  sdshop = @pcShop AND
-                   sdtxdt = @pdTxdt AND
-                   sdcrid = @pcCrid AND
-                   sdinvo = @pnInvo
+            WHERE  sdshop = @shopID AND
+                   sdtxdt = @TransDate AND
+                   sdcrid = @crid AND
+                   sdinvo = @invoiceID
 
           SELECT @lnTqty = sum(CASE
                                  WHEN sdtype = 'S' THEN sdtqty
@@ -350,10 +251,10 @@ AS
                                                                                                                                   END
                                                                                                                               END)
           FROM   crsald
-          WHERE  sdshop = @pcShop AND
-                 sdtxdt = @pdTxdt AND
-                 sdcrid = @pcCrid AND
-                 sdinvo = @pnInvo
+          WHERE  sdshop = @shopID AND
+                 sdtxdt = @TransDate AND
+                 sdcrid = @crid AND
+                 sdinvo = @invoiceID
 
           SELECT @lnDinv = 0,@lnRinv = 0
 
@@ -372,20 +273,20 @@ AS
                  (tttdrt,ttcurr,ttlamt,ttoamt)
           SELECT cttdrt,ctcurr,ctlamt=sum(ctlamt),ctoamt=sum(ctoamt)
           FROM   crctdr
-          WHERE  cttxdt = @pdTxdt AND
-                 ctshop = @pcShop AND
-                 ctcrid = @pcCrid AND
-                 ctinvo = @pnInvo
+          WHERE  cttxdt = @TransDate AND
+                 ctshop = @shopID AND
+                 ctcrid = @crid AND
+                 ctinvo = @invoiceID
           GROUP  BY cttdrt,ctcurr
 
           IF NOT EXISTS( SELECT *
                          FROM   syproc
-                         WHERE  prshop = @pcShop AND
+                         WHERE  prshop = @shopID AND
                                 prtype = 'CRSAL' AND
                                 prtxnt = @lcpara )
             INSERT syproc
                    (prshop,prtype,prtxnt)
-            VALUES (@pcShop,'CRSAL',@lcpara)
+            VALUES (@shopID,'CRSAL',@lcpara)
 
           UPDATE crcdwh
           SET    dhdinv = dhdinv + @lnDinv,
@@ -394,188 +295,189 @@ AS
                  dhrinv = dhrinv + @lnRinv,
                  dhrqty = dhrqty + @lnRqty,
                  dhramt = dhramt + @lnramt
-          WHERE  dhtxdt = @pdTxdt AND
-                 dhshop = @pcShop AND
-                 dhcrid = @pcCrid AND
+          WHERE  dhtxdt = @TransDate AND
+                 dhshop = @shopID AND
+                 dhcrid = @crid AND
                  dhshft = @lnShft
 
           UPDATE crcdwd
           SET    ddlamt = ddlamt + ttlamt,
                  ddoamt = ddoamt + ttoamt
           FROM   @tctdr
-          WHERE  ddtxdt = @pdTxdt AND
-                 ddshop = @pcShop AND
-                 ddcrid = @pcCrid AND
+          WHERE  ddtxdt = @TransDate AND
+                 ddshop = @shopID AND
+                 ddcrid = @crid AND
                  ddshft = @lnShft AND
                  ddtdrt = tttdrt AND
                  ddcurr = ttcurr
 
           INSERT crcdwd
                  (ddtxdt,ddshop,ddcrid,ddshft,ddmakt,ddtdrt,ddcurr,ddlamt,ddoamt,ddaamt)
-          SELECT @pdTxdt,@pcShop,@pcCrid,@lnShft,@lcMakt,tttdrt,ttcurr,ttlamt,ttoamt,0
+          SELECT @TransDate,@shopID,@crid,@lnShft,@lcMakt,tttdrt,ttcurr,ttlamt,ttoamt,0
           FROM   @tctdr
           WHERE  NOT EXISTS( SELECT *
                              FROM   crcdwd
-                             WHERE  ddtxdt = @pdTxdt AND
-                                    ddshop = @pcShop AND
-                                    ddcrid = @pcCrid AND
+                             WHERE  ddtxdt = @TransDate AND
+                                    ddshop = @shopID AND
+                                    ddcrid = @crid AND
                                     ddshft = @lnShft AND
                                     ddtdrt = tttdrt AND
                                     ddcurr = ttcurr )
 
-          IF @pmDiscAmt <> 0
+          IF @discountAmount <> 0
             BEGIN
                 DECLARE @lcDiscAmt nvarchar(200)
 
-                SET @lcDiscAmt = CONVERT(nvarchar(200), @pmDiscAmt)
-
-                EXEC MPos_Crm01_InsertProperty @pdTxdt,@pcShop,@pcCrid,@pnInvo,'INVDISCAMT',@lcDiscAmt
+                SET @lcDiscAmt = CONVERT(nvarchar(200), @discountAmount)
+                --记录发票的折扣金额
+                EXEC MPos_Crm01_InsertProperty @TransDate,@shopID,@crid,@invoiceID,'INVDISCAMT',@lcDiscAmt
             END
 
-          IF @pmRedeemAmt <> 0
-            BEGIN
-                DECLARE @lcRedeemAmt nvarchar(200)
+       --    IF @redeemAmount <> 0
+       --      BEGIN
+       --          DECLARE @lcRedeemAmt nvarchar(200)
 
-                SET @lcRedeemAmt = CONVERT(nvarchar(200), @pmRedeemAmt)
+       --          SET @lcRedeemAmt = CONVERT(nvarchar(200), @redeemAmount)
+       --          --记录积分兑换金额
+       --          EXEC MPos_Crm01_InsertProperty @TransDate,@shopID,@crid,@invoiceID,'REDEEMAMT',@lcRedeemAmt
+       --      END
 
-                EXEC MPos_Crm01_InsertProperty @pdTxdt,@pcShop,@pcCrid,@pnInvo,'REDEEMAMT',@lcRedeemAmt
-            END
+       --    IF @redeemQuantity <> 0
+       --      BEGIN
+       --          DECLARE @lcRedeemQty nvarchar(200)
 
-          IF @pnRedeemQty <> 0
-            BEGIN
-                DECLARE @lcRedeemQty nvarchar(200)
+       --          --记录积分兑换数量
+       --          SET @lcRedeemQty = CONVERT(nvarchar(200), @redeemQuantity)
+       --          EXEC MPos_Crm01_InsertProperty @TransDate,@shopID,@crid,@invoiceID,'REDEEMQTY',@lcRedeemQty
+       --      END
 
-                SET @lcRedeemQty = CONVERT(nvarchar(200), @pnRedeemQty)
-
-                EXEC MPos_Crm01_InsertProperty @pdTxdt,@pcShop,@pcCrid,@pnInvo,'REDEEMQTY',@lcRedeemQty
-            END
-
-          IF len(@pcPromId) > 0
-            BEGIN
-                EXEC MPos_Crm01_InsertProperty @pdTxdt,@pcShop,@pcCrid,@pnInvo,'NOSTORHIST',@pcPromId
-            END
+       --    IF len(@promotionID) > 0
+       --      BEGIN
+       --          EXEC MPos_Crm01_InsertProperty @TransDate,@shopID,@crid,@invoiceID,'NOSTORHIST',@promotionID
+       --      END
 
           UPDATE crsalh
           SET    shtqty = @lnTqty,
                  shamnt = @lnTamt,
                  shupdt = 'Y'
-          WHERE  shtxdt = @pdTxdt AND
-                 shshop = @pcShop AND
-                 shcrid = @pcCrid AND
-                 shinvo = @pnInvo
+          WHERE  shtxdt = @TransDate AND
+                 shshop = @shopID AND
+                 shcrid = @crid AND
+                 shinvo = @invoiceID
 
-          EXEC MPos_crm01_jimai @pcShop,@pdTxdt,@pcCrid,@pnInvo
+       --    EXEC MPos_crm01_jimai @shopID,@TransDate,@crid,@invoiceID
 
           SELECT @lcCard = rtrim(shcust)
           FROM   crsalh
-          WHERE  shtxdt = @pdTxdt AND
-                 shshop = @pcShop AND
-                 shcrid = @pcCrid AND
-                 shinvo = @pnInvo
+          WHERE  shtxdt = @TransDate AND
+                 shshop = @shopID AND
+                 shcrid = @crid AND
+                 shinvo = @invoiceID
 
-          IF len(@lcCard) > 0
-            BEGIN
-                SELECT @lcKind = cdregn
-                FROM   cccard
-                WHERE  cdcard = @lcCard
+       --暂时不实现积分兑换功能 MIKE 2025-12-16
+       --    IF len(@lcCard) > 0
+       --      BEGIN
+       --          SELECT @lcKind = cdregn
+       --          FROM   cccard
+       --          WHERE  cdcard = @lcCard
 
-                SELECT @lcIden = max(cmiden)
-                FROM   crmeed
-                WHERE  cmshop = @pcShop AND
-                       cmfdat <= @pdTxdt AND
-                       cmtdat >= @pdTxdt AND
-                       charindex(@lcKind, cmkind) > 0 AND
-                       cmcanx <> 'Y'
+       --          SELECT @lcIden = max(cmiden)
+       --          FROM   crmeed
+       --          WHERE  cmshop = @pcShop AND
+       --                 cmfdat <= @pdTxdt AND
+       --                 cmtdat >= @pdTxdt AND
+       --                 charindex(@lcKind, cmkind) > 0 AND
+       --                 cmcanx <> 'Y'
 
-                IF NOT @lcIden IS NULL
-                  BEGIN
-                      SELECT @lcPomo = cmpomo
-                      FROM   crmeed
-                      WHERE  cmshop = @pcShop AND
-                             cmiden = @lcIden
+       --          IF NOT @lcIden IS NULL
+       --            BEGIN
+       --                SELECT @lcPomo = cmpomo
+       --                FROM   crmeed
+       --                WHERE  cmshop = @pcShop AND
+       --                       cmiden = @lcIden
 
-                      IF len(@lcPomo) = 0
-                        SET @lcMeed = 'Y'
-                      ELSE IF EXISTS( SELECT *
-                                 FROM   crsald
-                                 WHERE  sdtxdt = @pdTxdt AND
-                                        sdshop = @pcShop AND
-                                        sdcrid = @pcCrid AND
-                                        sdinvo = @pnInvo AND
-                                        sdprom = @lcPomo )
-                        SET @lcMeed = 'Y'
+       --                IF len(@lcPomo) = 0
+       --                  SET @lcMeed = 'Y'
+       --                ELSE IF EXISTS( SELECT *
+       --                           FROM   crsald
+       --                           WHERE  sdtxdt = @pdTxdt AND
+       --                                  sdshop = @pcShop AND
+       --                                  sdcrid = @pcCrid AND
+       --                                  sdinvo = @pnInvo AND
+       --                                  sdprom = @lcPomo )
+       --                  SET @lcMeed = 'Y'
 
-                      IF @lcMeed = 'Y'
-                        BEGIN
-                            UPDATE crmeed
-                            SET    cmfixc = CASE cmfixc
-                                              WHEN 0 THEN floor(cmodds * rand() + 1)
-                                              ELSE cmfixc
-                                            END,
-                                   cmcurc = cmcurc + 1
-                            WHERE  cmshop = @pcShop AND
-                                   cmiden = @lcIden
+       --                IF @lcMeed = 'Y'
+       --                  BEGIN
+       --                      UPDATE crmeed
+       --                      SET    cmfixc = CASE cmfixc
+       --                                        WHEN 0 THEN floor(cmodds * rand() + 1)
+       --                                        ELSE cmfixc
+       --                                      END,
+       --                             cmcurc = cmcurc + 1
+       --                      WHERE  cmshop = @pcShop AND
+       --                             cmiden = @lcIden
 
-                            SELECT @lmEdcr = cmedcr,@lmEdpt = cmedpt,@lnOdds = cmodds,@lnFixc = cmfixc,@lnCurc = cmcurc
-                            FROM   crmeed
-                            WHERE  cmshop = @pcShop AND
-                                   cmiden = @lcIden
+       --                      SELECT @lmEdcr = cmedcr,@lmEdpt = cmedpt,@lnOdds = cmodds,@lnFixc = cmfixc,@lnCurc = cmcurc
+       --                      FROM   crmeed
+       --                      WHERE  cmshop = @pcShop AND
+       --                             cmiden = @lcIden
 
-                            IF @lnFixc = @lnCurc
-                              BEGIN
-                                  IF @lmEdcr <> 0
-                                    BEGIN
-                                        DECLARE @lcMeedCredit nvarchar(200)
+       --                      IF @lnFixc = @lnCurc
+       --                        BEGIN
+       --                            IF @lmEdcr <> 0
+       --                              BEGIN
+       --                                  DECLARE @lcMeedCredit nvarchar(200)
 
-                                        SET @lcMeedCredit = CONVERT(nvarchar(200), @lmEdcr)
+       --                                  SET @lcMeedCredit = CONVERT(nvarchar(200), @lmEdcr)
 
-                                        EXEC ap_Crm01_InsertProperty @pdTxdt,@pcShop,@pcCrid,@pnInvo,'MEEDCREDIT',@lcMeedCredit
-                                    END
+       --                                  EXEC MPos_Crm01_InsertProperty @pdTxdt,@pcShop,@pcCrid,@pnInvo,'MEEDCREDIT',@lcMeedCredit
+       --                              END
 
-                                  IF @lmEdpt <> 0
-                                    BEGIN
-                                        DECLARE @lcMeedPoint nvarchar(200)
+       --                            IF @lmEdpt <> 0
+       --                              BEGIN
+       --                                  DECLARE @lcMeedPoint nvarchar(200)
 
-                                        SET @lcMeedPoint = CONVERT(nvarchar(200), @lmEdpt)
+       --                                  SET @lcMeedPoint = CONVERT(nvarchar(200), @lmEdpt)
 
-                                        EXEC ap_Crm01_InsertProperty @pdTxdt,@pcShop,@pcCrid,@pnInvo,'MEEDPOINT',@lcMeedPoint
-                                    END
-                              END
+       --                                  EXEC MPos_Crm01_InsertProperty @pdTxdt,@pcShop,@pcCrid,@pnInvo,'MEEDPOINT',@lcMeedPoint
+       --                              END
+       --                        END
 
-                            IF @lnOdds <= @lnCurc
-                              UPDATE crmeed
-                              SET    cmfixc = floor(cmodds * rand() + 1),
-                                     cmcurc = 0
-                              WHERE  cmshop = @pcShop AND
-                                     cmiden = @lcIden
-                        END
-                  END
-            --exec taskp_syproc_Sale    
-            END
+       --                      IF @lnOdds <= @lnCurc
+       --                        UPDATE crmeed
+       --                        SET    cmfixc = floor(cmodds * rand() + 1),
+       --                               cmcurc = 0
+       --                        WHERE  cmshop = @pcShop AND
+       --                               cmiden = @lcIden
+       --                  END
+       --            END
+       --      --exec taskp_syproc_Sale    
+       --      END
 
           COMMIT TRANSACTION
 
-          IF EXISTS( SELECT *
-                     FROM   crctdr
-                     WHERE  cttxdt = @pdTxdt AND
-                            ctshop = @pcShop AND
-                            ctcrid = @pcCrid AND
-                            ctinvo = @pnInvo AND
-                            cttdrt = 'C' AND
-                            ctlamt > 0 )
-            BEGIN
-                --select @pcShop = 'CCL69'
-                IF NOT EXISTS( SELECT *
-                               FROM   sydraw
-                               WHERE  sdshop = @pcShop )
-                  INSERT sydraw
-                         (sdshop,sdstat)
-                  VALUES(@pcShop,'')
-                ELSE
-                  UPDATE sydraw
-                  SET    sdstat = ''
-                  WHERE  sdshop = @pcShop
-            END
+       --    IF EXISTS( SELECT *
+       --               FROM   crctdr
+       --               WHERE  cttxdt = @pdTxdt AND
+       --                      ctshop = @pcShop AND
+       --                      ctcrid = @pcCrid AND
+       --                      ctinvo = @pnInvo AND
+       --                      cttdrt = 'C' AND
+       --                      ctlamt > 0 )
+       --      BEGIN
+       --          --select @pcShop = 'CCL69'
+       --          IF NOT EXISTS( SELECT *
+       --                         FROM   sydraw
+       --                         WHERE  sdshop = @pcShop )
+       --            INSERT sydraw
+       --                   (sdshop,sdstat)
+       --            VALUES(@pcShop,'')
+       --          ELSE
+       --            UPDATE sydraw
+       --            SET    sdstat = ''
+       --            WHERE  sdshop = @pcShop
+       --      END
 
           SELECT @lnError = 0
       END
@@ -585,28 +487,28 @@ AS
     IF @lnError = 1
       BEGIN
           DELETE FROM crsald
-          WHERE  sdshop = @pcShop AND
-                 sdtxdt = @pdTxdt AND
-                 sdcrid = @pcCrid AND
-                 sdinvo = @pnInvo
+          WHERE  sdshop = @shopID AND
+                 sdtxdt = @TransDate AND
+                 sdcrid = @crid AND
+                 sdinvo = @invoiceID
 
           DELETE FROM crctdr
-          WHERE  ctshop = @pcShop AND
-                 cttxdt = @pdTxdt AND
-                 ctcrid = @pcCrid AND
-                 ctinvo = @pnInvo
+          WHERE  ctshop = @shopID AND
+                 cttxdt = @TransDate AND
+                 ctcrid = @crid AND
+                 ctinvo = @invoiceID
 
           DELETE FROM crprop
-          WHERE  cpshop = @pcShop AND
-                 cptxdt = @pdTxdt AND
-                 cpcrid = @pcCrid AND
-                 cpinvo = @pnInvo
+          WHERE  cpshop = @shopID AND
+                 cptxdt = @TransDate AND
+                 cpcrid = @crid AND
+                 cpinvo = @invoiceID
 
           DELETE FROM crsalh
-          WHERE  shshop = @pcShop AND
-                 shtxdt = @pdTxdt AND
-                 shcrid = @pcCrid AND
-                 shinvo = @pnInvo
+          WHERE  shshop = @shopID AND
+                 shtxdt = @TransDate AND
+                 shcrid = @crid AND
+                 shinvo = @invoiceID
       END
 
     SELECT @lnError

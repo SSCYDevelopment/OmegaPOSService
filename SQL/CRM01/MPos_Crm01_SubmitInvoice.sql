@@ -22,6 +22,64 @@ AS
        ReturnID int,ReturnMessage varchar( 256 )
     );
 
+       -- store promotion calculation result from MPos_Crm01_CalcPromotion
+       IF @usePromotion = 'Y'
+       BEGIN
+              CREATE TABLE #CalcPromotionResult (
+                     TransDate SMALLDATETIME,
+                     Shop CHAR(5),
+                     Crid CHAR(3),
+                     CartID UNIQUEIDENTIFIER,
+                     InputTime SMALLDATETIME,
+                     Seqn INT,
+                     ItemType CHAR(1),
+                     Sku CHAR(21),
+                     StyleCode CHAR(15),
+                     Color CHAR(3),
+                     Size CHAR(3),
+                     Price MONEY,
+                     Discount MONEY,
+                     Qty INT,
+                     DiscountType CHAR(1),
+                     PromotionCode VARCHAR(12),
+                     Amnt MONEY,
+                     OPrice MONEY,
+                     OAmnt MONEY,
+                     SaleType CHAR(1),
+                     Line CHAR(3),
+                     [Change] CHAR(1),
+                     Brand CHAR(3),
+                     Cate CHAR(2),
+                     Ptype CHAR(1),
+                     DMark MONEY,
+                     Commision MONEY,
+                     PromotionID VARCHAR(20),
+                     DiscountID VARCHAR(20),
+                     DiscountBrandBit INT,
+                     DiscountPtyp CHAR(1),
+                     GPrice MONEY,
+                     LostSales CHAR(1),
+                     CumulateValue CHAR(1),
+                     VoucherID VARCHAR(100),
+                     BrandBit INT,
+                     SupplierID VARCHAR(8),
+                     PantsLength INT,
+                     Calced CHAR(1),
+                     Message NVARCHAR(100),
+                     PPrice MONEY,
+                     IsEshop CHAR(1)
+              );
+
+              INSERT INTO #CalcPromotionResult (
+                     TransDate, Shop, Crid, CartID, InputTime, Seqn, ItemType, Sku, StyleCode, Color, Size,
+                     Price, Discount, Qty, DiscountType, PromotionCode, Amnt, OPrice, OAmnt, SaleType, Line, [Change],
+                     Brand, Cate, Ptype, DMark, Commision, PromotionID, DiscountID, DiscountBrandBit, DiscountPtyp,
+                     GPrice, LostSales, CumulateValue, VoucherID, BrandBit, SupplierID, PantsLength, Calced, Message, PPrice, IsEshop
+              )
+              -- expected stored proc: MPos_Crm01_CalcPromotion @shopID, @tranDate, @crid, @cartID, @memberCard, @debug
+              EXEC MPos_Crm01_CalcPromotion @shopID, @tranDate, @crid, @cartID, @memberCard, 'N';
+       END
+
     -- 1. check payment
     IF NOT EXISTS ( SELECT *
                     FROM   dbo.crctdr (NOLOCK) a
