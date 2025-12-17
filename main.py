@@ -9,7 +9,9 @@ from db import GetCartItems
 from db import SaveCartItem
 from db import SaveCartPayment
 from db import SaveCartMemberCard
+from db import SaveDiscountTicket
 from db import SaveCartInfo
+from db import RemoveDiscountTicket
 from db import GetPaymentType
 from db import GetSuspend
 from db import CleanCart
@@ -308,6 +310,33 @@ def api_save_cart_membercard(
     return {"success": True, "result": result}
 
 
+## 保存/更新折扣券（调用存储过程 MPos_Crm01_SaveDiscountTicket）
+@app.get("/save-discount-ticket")
+def api_save_discount_ticket(
+    TransDate: str = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式"),
+    Shop: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+    CartID: str = Query(..., description="购物车 ID（uniqueidentifier），UUID 字符串"),
+    DiscountTicketID: str = Query(..., description="折扣券 ID（varchar(25)）"),
+    DiscountAmount: float = Query(..., description="折扣金额（money）"),
+):
+    result = SaveDiscountTicket(TransDate, Shop, Crid, CartID, DiscountTicketID, DiscountAmount)
+    return {"success": True, "result": result}
+
+
+## 删除折扣券（调用存储过程 MPos_Crm01_RemoveDiscountTicket）
+@app.get("/remove-discount-ticket")
+def api_remove_discount_ticket(
+    TransDate: str = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式"),
+    Shop: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+    CartID: str = Query(..., description="购物车 ID（uniqueidentifier），UUID 字符串"),
+    DiscountTicketID: str = Query(..., description="折扣券 ID（varchar(25)）"),
+):
+    affected = RemoveDiscountTicket(TransDate, Shop, Crid, CartID, DiscountTicketID)
+    return {"success": True, "affected": affected}
+
+
 ## 获取可用支付方式（调用存储过程 MPos_Crm01_GetPaymentType）
 @app.get("/payment-types")
 def api_get_payment_types(
@@ -325,6 +354,7 @@ def api_get_payment_types(
         except Exception:
             count = 1
     return {"success": True, "count": count, "data": data}
+
 
 
 ## 获取挂起购物车列表（调用存储过程 MPos_crm01_GetSuspend）
@@ -457,6 +487,10 @@ def api_sync_save_price(
         except Exception:
             count = 1
     return {"success": True, "count": count, "data": data}
+
+
+
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8081)

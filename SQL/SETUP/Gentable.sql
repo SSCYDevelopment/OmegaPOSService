@@ -775,3 +775,31 @@ Create Table syproc
      prtxnt char(40),
      primary key clustered (prshop, prtype, prtxnt))
 Go
+
+/*
+--**--
+*  @name: crdtik
+
+*  @category: Table
+*  @section: pos
+*  @type: 收银
+*  @purpose: discount ticket
+*  @parameter: ddtxdt 交易日期
+*  @parameter: ddshop 店铺
+*  @parameter: ddcrid 收银机
+*  @parameter: ddcart 购物车ID
+*  @parameter: ddtick 折扣券号码
+*  @parameter: dddisc 折扣金额
+--**--
+*/
+
+CREATE TABLE crdtik
+(
+   ddtxdt smalldatetime,
+   ddshop char(5),
+   ddcrid char(3),
+   ddcart uniqueidentifier,
+   ddtick varchar(25),
+   dddsct money,
+   PRIMARY KEY CLUSTERED(ddtxdt, ddshop, ddcrid, ddcart)
+)

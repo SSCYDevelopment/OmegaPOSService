@@ -394,6 +394,77 @@ def SaveCartMemberCard(TransDate, Shop, Crid, CartID, memberCard):
         raise e
 
 
+def SaveDiscountTicket(TransDate, Shop, Crid, cartID, DiscountTicketID, DiscountAmount):
+    """Call stored procedure MPos_Crm01_SaveDiscountTicket to insert or update a discount ticket record.
+
+    Parameters:
+    - TransDate: smalldatetime string (ISO recommended)
+    - Shop: char(5)
+    - Crid: char(3)
+    - cartID: uniqueidentifier/string
+    - DiscountTicketID: varchar(25)
+    - DiscountAmount: money/decimal
+
+    Returns: True on success
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_Crm01_SaveDiscountTicket ?, ?, ?, ?, ?, ?"
+
+        try:
+            cursor.execute(sql, (TransDate, Shop, Crid, cartID, DiscountTicketID, DiscountAmount))
+            conn.commit()
+        except Exception as sql_ex:
+            logging.error(f"SQL Execute Error: {sql} | Params: {TransDate}, {Shop}, {Crid}, {cartID}, {DiscountTicketID}, {DiscountAmount} | Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        cursor.close()
+        conn.close()
+
+        return True
+
+    except Exception as e:
+        raise e
+
+
+def RemoveDiscountTicket(TransDate, Shop, Crid, cartID, DiscountTicketID):
+    """Call stored procedure MPos_Crm01_RemoveDiscountTicket to delete a discount ticket record.
+
+    Parameters:
+    - TransDate: smalldatetime string (ISO recommended)
+    - Shop: char(5)
+    - Crid: char(3)
+    - cartID: uniqueidentifier/string
+    - DiscountTicketID: varchar(25)
+
+    Returns: number of affected rows (int)
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_Crm01_RemoveDiscountTicket ?, ?, ?, ?, ?"
+
+        try:
+            cursor.execute(sql, (TransDate, Shop, Crid, cartID, DiscountTicketID))
+            conn.commit()
+        except Exception as sql_ex:
+            logging.error(f"SQL Execute Error: {sql} | Params: {TransDate}, {Shop}, {Crid}, {cartID}, {DiscountTicketID} | Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        affected = cursor.rowcount
+
+        cursor.close()
+        conn.close()
+
+        return affected
+
+    except Exception as e:
+        raise e
+
+
 def CleanCartPayment(TransDate, Shop, Crid, CartID):
     try:
         conn = get_connection()

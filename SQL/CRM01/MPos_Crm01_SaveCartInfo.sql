@@ -3,11 +3,11 @@ DROP PROC MPos_Crm01_SaveCartInfo
 GO
 
 CREATE PROC MPos_Crm01_SaveCartInfo
-  @TransDate    smalldatetime, --ÏúÊÛÈÕÆÚ
-  @Shop         char(5), --ÏúÊÛÃÅµê
-  @Crid         char(3), --ÊÕÒø»úºÅÂë
-  @CartID       uniqueidentifier, --¹ºÎï³µID
-  @memberCard      char(10), --»áÔ±¿¨ºÅ
+  @TransDate    smalldatetime, --é”€å”®æ—¥æœŸ
+  @Shop         char(5), --é”€å”®é—¨åº—
+  @Crid         char(3), --æ”¶é“¶æœºå·ç 
+  @CartID       uniqueidentifier, --è´­ç‰©è½¦ID
+  @memberCard      char(10), --ä¼šå‘˜å¡å·
   @SalesAssociate         varchar(40),
   @isEshop      char(1) = '',
   @CityID       int = 0,
