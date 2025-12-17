@@ -670,7 +670,7 @@ def CheckStyl(pcSkun: str, pcMakt: str = '', pcShop: str = ''):
         conn = get_connection()
         cursor = conn.cursor()
 
-        sql = "EXEC MPos_CheckStyl ?, ?, ?"
+        sql = "EXEC MPos_Public_CheckStyl ?, ?, ?"
 
         try:
             cursor.execute(sql, (pcSkun, pcMakt, pcShop))
