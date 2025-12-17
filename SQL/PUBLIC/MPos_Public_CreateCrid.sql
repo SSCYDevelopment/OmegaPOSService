@@ -1,5 +1,5 @@
 --创建收银机号
-DROP PROCEDURE MPos_Public_CreateCrid
+DROP PROCEDURE if exists MPos_Public_CreateCrid
 go
 CREATE PROCEDURE MPos_Public_CreateCrid
   @shopID  char(5),

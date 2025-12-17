@@ -1,4 +1,4 @@
-DROP PROCEDURE MPos_Crm01_SubmitInvoice;
+DROP PROCEDURE if exists MPos_Crm01_SubmitInvoice;
 GO
 CREATE PROCEDURE MPos_Crm01_SubmitInvoice
   @marketID CHAR(2),
@@ -25,12 +25,16 @@ AS
 
 
     -- 1. check payment
+
+
+
+
+
     IF NOT EXISTS ( SELECT *
-                    FROM   dbo.crctdr (NOLOCK) a
-                    WHERE  a.cttxdt = @tranDate AND
-                           a.ctshop = @shopID AND
-                           a.ctcrid = @crid AND
-                           a.ctinvo = @invoiceID )
+                    FROM   dbo.crcinv (NOLOCK) a
+                    WHERE  a.TransDate = @tranDate AND
+                           a.Shop = @shopID AND
+                           a.Crid = @crid )
       BEGIN
           INSERT @return
                  (ReturnID,
@@ -271,9 +275,44 @@ AS
 	    @shopID,                    -- cpshop - char(5)
 	    @crid,                    -- cpcrid - char(3)
 	    @invoiceID,                     -- cpinvo - int
-	    'DiscountTicket',                    -- cpprop - varchar(10)
-	    ''                   -- cpvalu - nvarchar(2000)
+	    'MEMBCARD',                    -- cpprop - varchar(10)
+	    @memberCard                   -- cpvalu - nvarchar(2000)
 	    )
+
+
+
+       INSERT dbo.crprop(
+           cptxdt,
+           cpshop,
+           cpcrid,
+           cpinvo,
+           cpprop,
+           cpvalu
+       )
+       VALUES(
+           @tranDate, -- cptxdt - smalldatetime
+           @shopID,                    -- cpshop - char(5)
+           @crid,                    -- cpcrid - char(3)
+           @invoiceID,                     -- cpinvo - int
+           'MEMBTYPE',                    -- cpprop - varchar(10)
+           @memberCardType                   -- cpvalu - nvarchar(2000)
+           )
+
+       INSERT dbo.crprop(
+           cptxdt,
+           cpshop,
+           cpcrid,
+           cpinvo,
+           cpprop,
+           cpvalu
+       )VALUES(
+           @tranDate, -- cptxdt - smalldatetime
+           @shopID,                    -- cpshop - char(5)
+           @crid,                    -- cpcrid - char(3)
+           @invoiceID,                     -- cpinvo - int
+           'USEPROMO',                    -- cpprop - varchar(10)
+           @usePromotion                   -- cpvalu - nvarchar(2000)
+           )
 
     declare @lmIamt money --货品金额
     declare @lmCamt money --支付金额
@@ -319,7 +358,7 @@ AS
     IF @lmIamt IS NULL
       SET @lmIamt = 0           
 	
-	UPDATE a SET a.shupdt='Y' FROM crsalh a WHERE a.shtxdt= @tranDate AND a.shcrid=@crid AND a.shshop = @shopID AND a.shinvo = @invoiceID
+	--UPDATE a SET a.shupdt='Y' FROM crsalh a WHERE a.shtxdt= @tranDate AND a.shcrid=@crid AND a.shshop = @shopID AND a.shinvo = @invoiceID
 
     IF @lnError = 1
       BEGIN

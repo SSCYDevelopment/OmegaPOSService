@@ -1,6 +1,6 @@
-DROP PROCEDURE [dbo].[MPos_Public_CheckStyl]
+DROP PROCEDURE if EXISTS MPos_Public_CheckStyl
 go
-CREATE PROCEDURE [dbo].[MPos_Public_CheckStyl]
+CREATE PROCEDURE MPos_Public_CheckStyl
   @pcSkun varchar(21),
   @pcMakt char(2) = '',
   @pcShop char(5) = ''

@@ -5,14 +5,14 @@ CREATE PROC MPos_Crm01_SaveCartPayment
   @Shop      char(5),
   @Crid      char(3),
   @CartID    uniqueidentifier,
-  @paymentType      char(1) , --支付方式
-  @Code      char(20), --支付序列号（卡号、账号）
-  @currency      char(3), --货币
-  @localAmount      money, --本币
-  @originalAmount      money, --原币
-  @exchangeRate      MONEY, --汇率
-  @type      INT =0, --类型1（备用）
-  @ptype     char(1) = '' --类型2（备用）
+  @paymentType      char(1) , --鏀粯鏂瑰紡
+  @Code      char(20), --鏀粯搴忓垪鍙凤紙鍗″彿銆佽处鍙凤級
+  @currency      char(3), --璐у竵
+  @localAmount      money, --鏈竵
+  @originalAmount      money, --鍘熷竵
+  @exchangeRate      MONEY, --姹囩巼
+  @type      INT =0, --绫诲瀷1锛堝鐢級
+  @ptype     char(1) = '' --绫诲瀷2锛堝鐢級
   
 AS
     IF EXISTS( SELECT *
