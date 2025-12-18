@@ -15,8 +15,8 @@ BASE_URL = config.GBAPI_CONFIG["BASE_URL"]
 APPID = config.GBAPI_CONFIG["APPID"]
 APPKEY = config.GBAPI_CONFIG["APPKEY"]
 
-TOKEN = ""
-TOKEN_EXPIRE_TIME = 0  # 添加这行
+TOKEN = "" # api token
+TOKEN_EXPIRE_TIME = 0  # api token 将会过期的时间
 
 # 创建广百API路由器
 gb_router = APIRouter(prefix="/gb", tags=["广百接口"])
@@ -39,6 +39,12 @@ def client_token():
     }
     response = post(url=url, param=param)
     return response
+
+@gb_router.post("/reset-gbapi-token", response_model=BaseResponse)
+def reset_gbapi_token():
+    global TOKEN
+    TOKEN = ""
+
 
 @gb_router.post("/find-member-info-brand", response_model=BaseResponse)
 def find_member_info_brand(request: FindMemberInfoBrandRequest = Body(...)):
@@ -89,6 +95,7 @@ def find_member_info_brand(request: FindMemberInfoBrandRequest = Body(...)):
                 message=f"接口调用异常: {str(e)}"
             ).dict()
         )
+
 
 @gb_router.post("/query-xfk-info", response_model=BaseResponse)
 def query_xfk_info(request: QueryXfkInfoRequest = Body(...)):
@@ -709,29 +716,50 @@ def gb_post(url: str, param: Optional[Dict[str, str]]):
     
     global TOKEN, TOKEN_EXPIRE_TIME  
 
-    current_time = time.time()
-    if (TOKEN == ""  or current_time >= TOKEN_EXPIRE_TIME - 300):
-        getTokenResponse = client_token()
-
-        if getTokenResponse["code"] < 1:
-            message = getTokenResponse["message"]
-            return get_api_response(0, f"获取接口TOKEN失败：{message}")
-        else:
-            responseData = getTokenResponse["data"]
-            if responseData.get("accessToken"):
-                TOKEN = responseData["accessToken"]
-                # 设置TOKEN过期时间（1小时有效期）
-                TOKEN_EXPIRE_TIME = current_time + 3600
-                write_info_log(f"获取新TOKEN: {TOKEN[:20]}...")
-            else:
-                return get_api_response(0, f"获取接口TOKEN失败：返回数据中找不到accessToken")
+    retry_count = 0
+    max_retries = 1  # 最多重试一次
     
-    post_headers = {
-        "accessToken": TOKEN
-    }
-    response = post(url, param, post_headers)
+    while True:
+        current_time = time.time()
+        if (TOKEN == ""  or current_time >= TOKEN_EXPIRE_TIME - 300):
+            write_info_log("TOKEN为空或即将过期，正在获取新TOKEN...")
+            getTokenResponse = client_token()
 
-    return response
+            if getTokenResponse["code"] < 1:
+                message = getTokenResponse["message"]
+                # 这里如果报错是TOken过期的话，可以自动重取一下TOKEN，然后再Retry一次接口
+                return get_api_response(0, f"获取接口TOKEN失败：{message}")
+            else:
+                responseData = getTokenResponse["data"]
+                if responseData.get("accessToken"):
+                    TOKEN = responseData["accessToken"]
+                    # 设置TOKEN过期时间（1小时有效期）
+                    TOKEN_EXPIRE_TIME = current_time + 3600
+                    write_info_log(f"获取新TOKEN: {TOKEN[:20]}...")
+                else:
+                    return get_api_response(0, f"获取接口TOKEN失败：返回数据中找不到accessToken")
+        
+        post_headers = {
+            "accessToken": TOKEN
+        }
+
+        response = post(url, param, post_headers)
+
+        # 检查是否是TOKEN过期错误
+        if response["code"] < 1 and "token授权过期" in response["message"].lower() and retry_count < max_retries:
+            write_info_log(f"检测到TOKEN过期，正在进行第 {retry_count + 1} 次重试...")
+            write_info_log(f"原始错误信息: {response['message']}")
+
+            # 清空TOKEN
+            TOKEN = ""
+            TOKEN_EXPIRE_TIME = 0
+
+            retry_count += 1
+
+            # 上面清空了TOKEN，然后循环一次获取token后再次调用接口
+            continue
+
+        return response
 
 
 def post(url: str, param: Optional[Dict[str, str]], headers: Optional[Dict[str, str]]=None):
