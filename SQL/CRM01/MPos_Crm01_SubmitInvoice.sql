@@ -233,7 +233,7 @@ AS
 	)
 
 	
-	SELECT @tranDate, @shopID, @crid, @invoiceID, a.Seqn, a.ItemType, a.Sku, a.Price, a.Qty, a.OAmnt - a.Amnt,0,a.DiscountID, a.PromotionID
+	SELECT @tranDate, @shopID, @crid, @invoiceID, a.Seqn, a.ItemType, a.Sku, a.OPrice, a.Qty, a.OAmnt - a.Amnt,0,a.DiscountID, a.PromotionID
 		FROM dbo.crcart a WHERE a.TransDate=@tranDate AND a.Shop = @shopID AND a.Crid = @crid AND a.CartID = @cartID
 
 -- 5. create crctdr

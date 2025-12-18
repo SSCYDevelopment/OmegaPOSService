@@ -1,4 +1,4 @@
-DROP PROC MPos_Crm01_Update
+DROP PROC if exists MPos_Crm01_Update
 go
 CREATE PROCEDURE MPos_Crm01_Update
   @shopID      char(5),
@@ -113,6 +113,9 @@ AS
     SET @lmCamt = @lmCamt + @discountAmount
     SET @lcMeed = 'N'
 
+       print @lmCamt
+       print @lmIamt
+       
     IF @lmCamt = @lmIamt  OR
        floor(@lmCamt) = floor(@lmIamt)  OR
        ceiling(@lmCamt) = ceiling(@lmIamt)  OR
@@ -120,6 +123,7 @@ AS
        ceiling(@lmCamt) = floor(@lmIamt)  OR
        round(@lmCamt, @lnDEC, abs(@lnDEC)) = round(@lmIamt, @lnDEC, abs(@lnDEC))
       BEGIN
+          print 'lmCamt=lmIamt'
           SET xact_abort ON
 
           BEGIN TRANSACTION
@@ -278,6 +282,8 @@ AS
                  ctcrid = @crid AND
                  ctinvo = @invoiceID
           GROUP  BY cttdrt,ctcurr
+
+
 
           IF NOT EXISTS( SELECT *
                          FROM   syproc
@@ -486,29 +492,30 @@ AS
 
     IF @lnError = 1
       BEGIN
-          DELETE FROM crsald
-          WHERE  sdshop = @shopID AND
-                 sdtxdt = @TransDate AND
-                 sdcrid = @crid AND
-                 sdinvo = @invoiceID
+       print 'error = 1'
+       --    DELETE FROM crsald
+       --    WHERE  sdshop = @shopID AND
+       --           sdtxdt = @TransDate AND
+       --           sdcrid = @crid AND
+       --           sdinvo = @invoiceID
 
-          DELETE FROM crctdr
-          WHERE  ctshop = @shopID AND
-                 cttxdt = @TransDate AND
-                 ctcrid = @crid AND
-                 ctinvo = @invoiceID
+       --    DELETE FROM crctdr
+       --    WHERE  ctshop = @shopID AND
+       --           cttxdt = @TransDate AND
+       --           ctcrid = @crid AND
+       --           ctinvo = @invoiceID
 
-          DELETE FROM crprop
-          WHERE  cpshop = @shopID AND
-                 cptxdt = @TransDate AND
-                 cpcrid = @crid AND
-                 cpinvo = @invoiceID
+       --    DELETE FROM crprop
+       --    WHERE  cpshop = @shopID AND
+       --           cptxdt = @TransDate AND
+       --           cpcrid = @crid AND
+       --           cpinvo = @invoiceID
 
-          DELETE FROM crsalh
-          WHERE  shshop = @shopID AND
-                 shtxdt = @TransDate AND
-                 shcrid = @crid AND
-                 shinvo = @invoiceID
+       --    DELETE FROM crsalh
+       --    WHERE  shshop = @shopID AND
+       --           shtxdt = @TransDate AND
+       --           shcrid = @crid AND
+       --           shinvo = @invoiceID
       END
 
     SELECT @lnError

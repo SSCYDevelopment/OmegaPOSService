@@ -1,6 +1,7 @@
-DROP PROCEDURE EPOS_Crm01_CalcCompaign
+DROP PROCEDURE if exists MPOS_Crm01_CalcCompaign
 GO
-CREATE PROCEDURE EPOS_Crm01_CalcCompaign @shopID CHAR(5),
+CREATE PROCEDURE MPOS_Crm01_CalcCompaign 
+    @shopID CHAR(5),
 	@transactionDate SMALLDATETIME,
 	@crid CHAR(3),
 	@cartID UNIQUEIDENTIFIER,

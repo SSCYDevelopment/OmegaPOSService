@@ -56,7 +56,6 @@ EXEC @CreateInvReturn = MPos_Crm01_NewInvo @PCSHOP = 'GZ86',
 PRINT 'MPos_Crm01_NewInvo 返回码：' + CAST(@CreateInvReturn AS VARCHAR(12));
 PRINT '创建的发票号：' + ISNULL(@InvoiceNo, '');
 
-
 /*****************************************/
 /*section 4: 模拟输入条码到发票明细测试    */
 /*****************************************/
@@ -107,36 +106,34 @@ WHERE TransDate = '2025-12-17'
 	AND Crid = '999'
 	AND CartID = '2031DC7C-7779-4509-B7A1-4B283CEAB59D'
 
-
-
 --添加商品到购物车 第二件商品
 EXEC MPos_Public_CheckStyl '2050000221286',
 	'CN',
 	'GZ86'
 
 EXEC MPos_Crm01_SaveCartItem @TransDate = '2025-12-17',
-    @Shop = 'GZ86',
-    @Crid = '999',
-    @CartID = '2031DC7C-7779-4509-B7A1-4B283CEAB59D',
-    @Seqn = - 1,
-    @ItemType = 'S',
-    @skuBarcode = '2050000221286',
-    @StyleCode = '60020203',
-    @Color = '000',
-    @Size = '000',
-    @qty = 2,
-    @Weight = 0,
-    @Price = 59.97,
-    @OPrice = 84,
-    @Amnt = 119.94,
-    @OAmnt = 168,
-    @Discount = 0,
-    @DiscountType = '',
-    @DiscountID = '',
-    @DiscountBrandBit = - 1,
-    @DiscountPtyp = '',
-    @PromotionCode = '',
-    @PromotionID = ''
+	@Shop = 'GZ86',
+	@Crid = '999',
+	@CartID = '2031DC7C-7779-4509-B7A1-4B283CEAB59D',
+	@Seqn = - 1,
+	@ItemType = 'S',
+	@skuBarcode = '2050000221286',
+	@StyleCode = '60020203',
+	@Color = '000',
+	@Size = '000',
+	@qty = 2,
+	@Weight = 0,
+	@Price = 59.97,
+	@OPrice = 84,
+	@Amnt = 119.94,
+	@OAmnt = 168,
+	@Discount = 0,
+	@DiscountType = '',
+	@DiscountID = '',
+	@DiscountBrandBit = - 1,
+	@DiscountPtyp = '',
+	@PromotionCode = '',
+	@PromotionID = ''
 
 --再检查一下购物车
 SELECT *
@@ -144,82 +141,143 @@ FROM crcart
 WHERE TransDate = '2025-12-17'
 	AND Shop = 'GZ86'
 	AND Crid = '999'
-	AND CartID = '2031DC7C-7779-4509-B7A1-4B283CEAB59D'    
+	AND CartID = '2031DC7C-7779-4509-B7A1-4B283CEAB59D'
 
 --获取购物车总金额和总数量
 DECLARE @TotalAmount MONEY;
-declare @UnipriceTotalAmount MONEY;
+DECLARE @UnipriceTotalAmount MONEY;
 DECLARE @TotalQty INT;
+
 SELECT @TotalAmount = SUM(Amnt),
-       @UnipriceTotalAmount = SUM(OAmnt),
-       @TotalQty = SUM(Qty) from crcart
+	@UnipriceTotalAmount = SUM(OAmnt),
+	@TotalQty = SUM(Qty)
+FROM crcart
 WHERE TransDate = '2025-12-17'
-    AND Shop = 'GZ86'
-    AND Crid = '999'
-    AND CartID = '2031DC7C-7779-4509-B7A1-4B283CEAB59D';
+	AND Shop = 'GZ86'
+	AND Crid = '999'
+	AND CartID = '2031DC7C-7779-4509-B7A1-4B283CEAB59D';
 
 --打印总金额和总数量
-PRINT '购物车总金额：' + CAST(@TotalAmount AS VARCHAR(20)); 
-PRINT '购物车总数量：' + CAST(@TotalQty AS VARCHAR(10));    
+PRINT '购物车总金额：' + CAST(@TotalAmount AS VARCHAR(20));
+PRINT '购物车总数量：' + CAST(@TotalQty AS VARCHAR(10));
 
 --添加付款方式, 以先现金为例测试
-exec MPos_Crm01_SaveCartPayment
-    @TransDate = '2025-12-17',
-    @Shop = 'GZ86',
-    @Crid = '999',
-    @CartID = '2031DC7C-7779-4509-B7A1-4B283CEAB59D',
-    @paymentType = 'C',
-    @code='',
-    @currency='RMB',
-    @localAmount = @TotalAmount,
-    @originalAmount = @TotalAmount,
-    @exchangeRate = 1,
-    @type = 0,
-    @ptype = ''
+EXEC MPos_Crm01_SaveCartPayment @TransDate = '2025-12-17',
+	@Shop = 'GZ86',
+	@Crid = '999',
+	@CartID = '2031DC7C-7779-4509-B7A1-4B283CEAB59D',
+	@paymentType = 'C',
+	@code = '',
+	@currency = 'RMB',
+	@localAmount = @TotalAmount,
+	@originalAmount = @TotalAmount,
+	@exchangeRate = 1,
+	@type = 0,
+	@ptype = ''
 
 --检查付款方式保存记录
-select * from crcinv
+SELECT *
+FROM crcinv
 WHERE TransDate = '2025-12-17'
-    AND Shop = 'GZ86'
-    AND Crid = '999'
-    AND CartID = '2031DC7C-7779-4509-B7A1-4B283CEAB59D'
-
+	AND Shop = 'GZ86'
+	AND Crid = '999'
+	AND CartID = '2031DC7C-7779-4509-B7A1-4B283CEAB59D'
 
 /*****************************************/
 /*section 5: 完成发票提交发票测试          */
 /*****************************************/
---提交发票，返回0表示成功
-EXEC MPos_Crm01_SubmitInvoice
-    @marketID = 'CN',
-    @operator = 'mikechan',
-    @tranDate = '2025-12-17',
-    @shopID = 'GZ86',
-    @crid = '999',
-    @invoiceID = 1,
-    @cartID = '2031DC7C-7779-4509-B7A1-4B283CEAB59D',
-    @memberCard = '',
-    @memberCardType = '',
-    @salesAssociate = '',
-    @usePromotion = 'N'
-
- --查看创建出来的单据
-select * from crsalh
-WHERE shtxdt = '2025-12-17'
-    AND shshop = 'GZ86'
-    AND shcrid = '999'
-    AND shinvo = 1
-select * from crsald
-WHERE sdtxdt = '2025-12-17'
-    AND sdshop = 'GZ86'
-    AND sdcrid = '999'
-    AND sdinvo = 1
-select * from crctdr
-WHERE cttxdt = '2025-12-17'
-    AND ctshop = 'GZ86'
-    AND ctcrid = '999'
-    AND ctinvo = 1
-select * from crprop
+--清空测试结果
+DELETE
+FROM crprop
 WHERE cptxdt = '2025-12-17'
-    AND cpshop = 'GZ86'
-    AND cpcrid = '999'
-    AND cpinvo = 1
+	AND cpshop = 'GZ86'
+	AND cpcrid = '999'
+	AND cpinvo = 1
+
+DELETE
+FROM crctdr
+WHERE cttxdt = '2025-12-17'
+	AND ctshop = 'GZ86'
+	AND ctcrid = '999'
+	AND ctinvo = 1
+
+DELETE
+FROM crsald
+WHERE sdtxdt = '2025-12-17'
+	AND sdshop = 'GZ86'
+	AND sdcrid = '999'
+	AND sdinvo = 1
+
+DELETE
+FROM crsalh
+WHERE shtxdt = '2025-12-17'
+	AND shshop = 'GZ86'
+	AND shcrid = '999'
+	AND shinvo = 1
+
+--检查购物车计算结果
+EXEC mpos_crm01_CalcCompaign @ShopID = 'GZ86',
+	@TransactionDate = '2025-12-17',
+	@Crid = '999',
+	@CartID = '2031DC7C-7779-4509-B7A1-4B283CEAB59D'
+
+--提交发票，返回0表示成功
+EXEC MPos_Crm01_SubmitInvoice @marketID = 'CN',
+	@operator = 'mikechan',
+	@tranDate = '2025-12-17',
+	@shopID = 'GZ86',
+	@crid = '999',
+	@invoiceID = 1,
+	@cartID = '2031DC7C-7779-4509-B7A1-4B283CEAB59D',
+	@memberCard = '',
+	@memberCardType = '',
+	@salesAssociate = '',
+	@usePromotion = 'N'
+
+--查看创建出来的单据
+SELECT *
+FROM crsalh
+WHERE shtxdt = '2025-12-17'
+	AND shshop = 'GZ86'
+	AND shcrid = '999'
+	AND shinvo = 1
+
+SELECT *
+FROM crsald
+WHERE sdtxdt = '2025-12-17'
+	AND sdshop = 'GZ86'
+	AND sdcrid = '999'
+	AND sdinvo = 1
+
+SELECT *
+FROM crctdr
+WHERE cttxdt = '2025-12-17'
+	AND ctshop = 'GZ86'
+	AND ctcrid = '999'
+	AND ctinvo = 1
+
+SELECT *
+FROM crprop
+WHERE cptxdt = '2025-12-17'
+	AND cpshop = 'GZ86'
+	AND cpcrid = '999'
+	AND cpinvo = 1
+
+--获取货品总金额
+SELECT sum(CASE 
+			WHEN sdtype = 'S'
+				THEN sdtqty * sdsprc - sddsct
+			ELSE sddsct - sdtqty * sdsprc
+			END)
+FROM crsald
+WHERE sdshop = 'GZ86'
+	AND sdtxdt = '2025-12-17'
+	AND sdcrid = '999'
+	AND sdinvo = 1
+
+--把发票设置成为UPDATE(POSTED)状态
+EXEC MPos_Crm01_Update @shopID = 'GZ86',
+	@transDate = '2025-12-17',
+	@crid = '999',
+	@invoiceID = 1,
+	@discountAmount = 0
