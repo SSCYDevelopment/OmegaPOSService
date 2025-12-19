@@ -187,6 +187,7 @@ AS
                      ItemType CHAR(1),
                      Sku CHAR(21),
                      StyleCode CHAR(15),
+                     StyleLocalDescription NVARCHAR(100),
                      Color CHAR(3),
                      Size CHAR(3),
                      Price MONEY,
@@ -194,6 +195,7 @@ AS
                      Qty INT,
                      DiscountType CHAR(1),
                      PromotionCode VARCHAR(12),
+                     promotionDescription NVARCHAR(100) DEFAULT '',
                      Amnt MONEY,
                      OPrice MONEY,
                      OAmnt MONEY,
@@ -223,8 +225,8 @@ AS
               );
 
               INSERT INTO #CalcPromotionResult (
-                     TransDate, Shop, Crid, CartID, InputTime, Seqn, ItemType, Sku, StyleCode, Color, Size,
-                     Price, Discount, Qty, DiscountType, PromotionCode, Amnt, OPrice, OAmnt, SaleType, Line, [Change],
+                     TransDate, Shop, Crid, CartID, InputTime, Seqn, ItemType, Sku, StyleCode, StyleLocalDescription, Color, Size,
+                     Price, Discount, Qty, DiscountType, PromotionCode, promotionDescription, Amnt, OPrice, OAmnt, SaleType, Line, [Change],
                      Brand, Cate, Ptype, DMark, Commision, PromotionID, DiscountID, DiscountBrandBit, DiscountPtyp,
                      GPrice, LostSales, CumulateValue, VoucherID, BrandBit, SupplierID, PantsLength, Calced, Message, PPrice, IsEshop
               )

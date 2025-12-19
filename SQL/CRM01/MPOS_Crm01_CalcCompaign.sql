@@ -43,7 +43,8 @@ FROM sysdat
 WHERE ssshop = @shopID
 
 DECLARE @Items TABLE (
-	Itskun CHAR(15),
+	Itskun CHAR(21),
+	ItStyl char(15),
 	Itsequ SMALLINT,
 	Itnseq SMALLINT IDENTITY,
 	Itpric MONEY,
@@ -55,7 +56,7 @@ DECLARE @Items TABLE (
 	Itquty INT,
 	Ituqty INT DEFAULT 0,
 	Ittype CHAR(1),
-	Itpsty CHAR(11) DEFAULT '',
+	Itpsty CHAR(15) DEFAULT '',
 	PRIMARY KEY CLUSTERED (Itnseq)
 	)
 
@@ -69,6 +70,7 @@ CREATE TABLE #crcart (
 	[ItemType] CHAR(1),
 	[Sku] CHAR(21),
 	[StyleCode] CHAR(15),
+	[StyleLocalDescription] NVARCHAR(100),
 	[Color] CHAR(3),
 	[Size] CHAR(3),
 	[Price] MONEY,
@@ -76,6 +78,7 @@ CREATE TABLE #crcart (
 	[Qty] INT,
 	[DiscountType] CHAR(1),
 	[PromotionCode] VARCHAR(12),
+	[PromotionDescription] NVARCHAR(100) DEFAULT '',
 	[Amnt] MONEY,
 	[OPrice] MONEY,
 	[OAmnt] MONEY,
@@ -107,6 +110,7 @@ CREATE TABLE #crcart (
 ----放入备算表                                                                            
 INSERT @Items (
 	Itskun,
+	ItStyl,
 	Itsequ,
 	Itpric,
 	Itnpri,
@@ -119,6 +123,7 @@ INSERT @Items (
 	Itpsty
 	)
 SELECT Sku,
+	a.StyleCode,
 	Seqn,
 	Oprice,
 	Price,
@@ -129,7 +134,7 @@ SELECT Sku,
 	Qty,
 	PType,
 	StyleCode
-FROM crcart(NOLOCK)
+FROM crcart(NOLOCK) a
 WHERE CartID = @cartID
 	AND ItemType = 'S'
 
@@ -281,14 +286,14 @@ BEGIN
 					BEGIN
 						SELECT *
 						FROM @Items
-						WHERE Dbo.MPOS_CRM01_CheckPromotionSkuMatch(@pdscop, itskun, Ittype) = 1
+						WHERE Dbo.MPOS_CRM01_CheckPromotionSkuMatch(@pdscop, itskun, ItStyl, Ittype) = 1
 							AND Itquty > Ituqty
 							AND Itbuse <> 'Y'
 					END
 
 					SELECT @lnMinSequ = Min(Itnseq)
 					FROM @Items
-					WHERE Dbo.MPOS_CRM01_CheckPromotionSkuMatch(@pdscop, itskun, Ittype) = 1
+					WHERE Dbo.MPOS_CRM01_CheckPromotionSkuMatch(@pdscop, itskun, ItStyl, Ittype) = 1
 						AND Itquty > Ituqty
 						AND Itbuse <> 'Y'
 
@@ -341,14 +346,14 @@ BEGIN
 							BEGIN
 								SELECT *
 								FROM @Items
-								WHERE Dbo.MPOS_CRM01_CheckPromotionSkuMatch(@pdscop, itskun, Ittype) = 1
+								WHERE Dbo.MPOS_CRM01_CheckPromotionSkuMatch(@pdscop, itskun, itstyl, Ittype) = 1
 									AND Itquty > Ituqty
 									AND Itbuse <> 'Y'
 							END
 
 							SELECT @lnMinSequ = Min(Itnseq)
 							FROM @Items
-							WHERE Dbo.MPOS_CRM01_CheckPromotionSkuMatch(@pdscop, itskun, Ittype) = 1
+							WHERE Dbo.MPOS_CRM01_CheckPromotionSkuMatch(@pdscop, itskun, itstyl,Ittype) = 1
 								AND Itquty > Ituqty
 								AND Itbuse <> 'Y'
 						END
@@ -647,6 +652,18 @@ SET [TransDate] = @transactionDate,
 	[Shop] = @shopID,
 	[Crid] = @crid,
 	[CartID] = @cartID
+
+
+update a
+set a.PromotionDescription = b.phdesc
+from #crcart a, crpomh(NOLOCK) b
+where a.PromotionID = b.phtxnt
+
+update a
+set a.StyleLocalDescription = b.smldes
+from #crcart a, mfstyl(NOLOCK) b
+where a.StyleCode = b.smcode
+
 
 SELECT *
 FROM #crcart

@@ -3,7 +3,8 @@ go
 CREATE FUNCTION MPOS_Crm01_CheckPromotionSkuMatch  
 (  
    @scopeID char(12),  
-   @skuID   char(15),  
+   @skuID   char(21),
+   @styleID char(15),
    @styp    char(1) = ''  
 )  
 returns int  
@@ -25,7 +26,7 @@ AS
                  FROM   crscop  
                  WHERE  scscop = @scopeID AND  
                         scstyl NOT IN ( 'ANY', '' ) AND  
-                        @skuID LIKE rtrim(scstyl) + '%' AND  
+                        (@skuID LIKE rtrim(scstyl) + '%' or @styleID LIKE rtrim(scstyl) + '%') AND  
                         ( scstyp = ''  OR  
                           scstyp = @styp ) )  
          SELECT @result = 1  

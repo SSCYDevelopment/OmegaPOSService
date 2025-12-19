@@ -299,3 +299,15 @@ EXEC MPos_Crm01_Update @shopID = 'GZ86',
 	@crid = '999',
 	@invoiceID = 2,
 	@discountAmount = 0
+
+--获取摊分COUPON后货品总金额
+SELECT sum(CASE 
+			WHEN sdtype = 'S'
+				THEN sdtqty * sdsprc - sddsct
+			ELSE sddsct - sdtqty * sdsprc
+			END)
+FROM crsald
+WHERE sdshop = 'GZ86'
+	AND sdtxdt = '2025-12-17'
+	AND sdcrid = '999'
+	AND sdinvo = 2

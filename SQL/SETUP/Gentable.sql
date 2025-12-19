@@ -393,6 +393,7 @@ CREATE TABLE [dbo].[crpomh]
     [phvrgn] CHAR(3) NOT NULL, 
     [phcanx] CHAR NOT NULL, 
     [phvlmt] CHAR NOT NULL DEFAULT '',
+    [phdesc] NVARCHAR(100) NOT NULL DEFAULT '',
     PRIMARY KEY ([phshop], [phtxnt])
 )
 
