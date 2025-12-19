@@ -93,6 +93,7 @@ AS
 		END
 
     -- 3. create crsalh
+    BEGIN TRY
     IF NOT EXISTS( SELECT *
                    FROM   dbo.crsalh a
                    WHERE  a.shtxdt = @tranDate AND
@@ -153,9 +154,27 @@ AS
                           a.shcrid = @crid AND
                           a.shinvo = @invoiceID
         END
+    END TRY
+    BEGIN CATCH
+       INSERT @return (
+              ReturnID,
+              ReturnMessage
+              )
+       VALUES (
+              - 4, -- ReturnID - int
+              '创建CRSALH失败：' + ERROR_MESSAGE() -- ReturnMessage - varchar(256)
+              );
+
+       SELECT a.ReturnID, a.ReturnMessage
+       FROM   @return a;
+
+    END CATCH
 
 -- 4. create crsald
        -- store promotion calculation result from MPos_Crm01_CalcPromotion
+   BEGIN TRY
+       
+
        IF @usePromotion = 'Y'
        BEGIN
               CREATE TABLE #CalcPromotionResult (
@@ -215,28 +234,106 @@ AS
 
 	DELETE FROM a FROM dbo.crsald a WHERE a.sdtxdt = @tranDate AND a.sdshop = @shopID AND a.sdcrid = @crid AND a.sdinvo = @invoiceID
 
-	INSERT dbo.crsald
-	(
-	    sdtxdt,
-	    sdshop,
-	    sdcrid,
-	    sdinvo,
-	    sdseqn,
-	    sdtype,
-	    sdskun,
-	    sdsprc,
-	    sdtqty,
-	    sddsct,
-	    sdvata,
-	    sddscd,
-	    sdprom
-	)
+       if @usePromotion='Y'
+              BEGIN
+                     INSERT dbo.crsald(
+                            sdtxdt,
+                            sdshop,
+                            sdcrid,
+                            sdinvo,
+                            sdseqn,
+                            sdtype,
+                            sdskun,
+                            sdsprc,
+                            sdtqty,
+                            sddsct,
+                            sdvata,
+                            sddscd,
+                            sdprom
+                     )
+
+                     SELECT
+                            @tranDate AS TransDate,
+                            @shopID AS Shop,
+                            @crid AS Crid,
+                            @invoiceID AS Invo,
+                            a.Seqn,
+                            a.ItemType,
+                            a.Sku,
+                            a.OPrice,
+                            a.Qty,
+                            a.OAmnt - a.Amnt,
+                            0 AS sdvata,
+                            a.DiscountID,
+                            a.PromotionID
+                     FROM   #CalcPromotionResult a
+                     WHERE  a.TransDate = @tranDate AND
+                            a.Shop = @shopID AND
+                            a.Crid = @crid AND
+                            a.CartID = @cartID
+              END
+
+       ELSE
+              BEGIN
+                     INSERT dbo.crsald
+                            (
+                                sdtxdt,
+                                sdshop,
+                                sdcrid,
+                                sdinvo,
+                                sdseqn,
+                                sdtype,
+                                sdskun,
+                                sdsprc,
+                                sdtqty,
+                                sddsct,
+                                sdvata,
+                                sddscd,
+                                sdprom
+                            )
+                     SELECT
+                            @tranDate AS TransDate,
+                            @shopID AS Shop,
+                            @crid AS Crid,
+                            @invoiceID AS Invo,
+                            a.Seqn,
+                            a.ItemType,
+                            a.Sku,
+                            a.OPrice,
+                            a.Qty,
+                            a.OAmnt - a.Amnt,
+                            0 AS sdvata,
+                            a.DiscountID,
+                            '' AS PromotionID
+                     FROM   dbo.crcart a
+                     WHERE  a.TransDate = @tranDate AND
+                            a.Shop = @shopID AND
+                            a.Crid = @crid AND
+                            a.CartID = @cartID
+              END
+              
+
+END TRY
+BEGIN CATCH
+	INSERT @return (
+		ReturnID,
+		ReturnMessage
+		)
+	VALUES (
+		- 5, -- ReturnID - int
+		'创建CRSALD失败：' + ERROR_MESSAGE() -- ReturnMessage - varchar(256)
+		);
 
 	
-	SELECT @tranDate, @shopID, @crid, @invoiceID, a.Seqn, a.ItemType, a.Sku, a.OPrice, a.Qty, a.OAmnt - a.Amnt,0,a.DiscountID, a.PromotionID
-		FROM dbo.crcart a WHERE a.TransDate=@tranDate AND a.Shop = @shopID AND a.Crid = @crid AND a.CartID = @cartID
+       SELECT a.ReturnID, a.ReturnMessage
+	FROM @return a
+
+	RETURN
+END CATCH
+
 
 -- 5. create crctdr
+BEGIN TRY
 	DELETE FROM a FROM dbo.crctdr A WHERE A.cttxdt = @tranDate AND a.ctshop = @shopID AND a.ctcrid = @crid AND a.ctinvo = @invoiceID
 
 	INSERT dbo.crctdr
@@ -257,9 +354,22 @@ AS
 		   a.Shop = @shopID AND
 		   a.Crid = @crid AND
 		   a.CartID = @cartID 
-	                                        
+END TRY
+BEGIN CATCH
+   INSERT @return (
+          ReturnID,
+          ReturnMessage
+          )
+   VALUES (
+          - 6, -- ReturnID - int
+          '创建CRCTDR失败：' + ERROR_MESSAGE() -- ReturnMessage - varchar(256)
+          );
+   select * from @return
+   RETURN
+END CATCH	                                        
 
 -- 6. create crprop
+BEGIN TRY
 	DELETE FROM a FROM dbo.crprop a WHERE a.cptxdt = @tranDate AND a.cpshop=@shopID AND a.cpcrid=@crid AND a.cpinvo = @invoiceID
 	INSERT dbo.crprop
 	(
@@ -313,7 +423,23 @@ AS
            'USEPROMO',                    -- cpprop - varchar(10)
            @usePromotion                   -- cpvalu - nvarchar(2000)
            )
+END TRY
+BEGIN CATCH
+   INSERT @return (
+          ReturnID,
+          ReturnMessage
+          )
+       VALUES (
+          - 7, -- ReturnID - int
+          '创建CRPROP失败：' + ERROR_MESSAGE() -- ReturnMessage - varchar(256)
+          );
+       select * from @return
+       RETURN
+END CATCH
 
+
+--7. 更新更表头表状态及填写累计金额
+BEGIN TRY
     declare @lmIamt money --货品金额
     declare @lmCamt money --支付金额
 
@@ -356,38 +482,80 @@ AS
       SET @lmCamt = 0
 
     IF @lmIamt IS NULL
-      SET @lmIamt = 0           
-	
+      SET @lmIamt = 0    
+
+
+
+--9 ti
+    UPDATE a
+    SET    a.shtqty = ( SELECT sum( CASE
+                                      WHEN sdtype = 'S' THEN sdtqty
+                                      ELSE - sdtqty
+                                    END )
+                        FROM   crsald
+                        WHERE  sdshop = @shopID AND
+                               sdtxdt = @tranDate AND
+                               sdcrid = @crid AND
+                               sdinvo = @invoiceID ),
+           a.shamnt = @lmIamt
+    FROM   dbo.crsalh a
+    WHERE  a.shtxdt = @tranDate AND
+           a.shshop = @shopID AND
+           a.shcrid = @crid AND
+           a.shinvo = @invoiceID       
+END TRY
+BEGIN CATCH
+   INSERT @return (
+          ReturnID,
+          ReturnMessage
+          )
+       VALUES (
+          - 8, -- ReturnID - int
+          '更新CRSALH汇总失败：' + ERROR_MESSAGE() -- ReturnMessage - varchar(256)
+          );
+END CATCH	
 	--UPDATE a SET a.shupdt='Y' FROM crsalh a WHERE a.shtxdt= @tranDate AND a.shcrid=@crid AND a.shshop = @shopID AND a.shinvo = @invoiceID
 
-    IF @lnError = 1
-      BEGIN
-          DELETE FROM crsald
-          WHERE  sdshop = @shopID AND
-                 sdtxdt = @tranDate AND
-                 sdcrid = @crid AND
-                 sdinvo = @invoiceID
+IF @lnError < 0
+BEGIN
+       DELETE FROM crsald
+       WHERE  sdshop = @shopID AND
+              sdtxdt = @tranDate AND
+              sdcrid = @crid AND
+              sdinvo = @invoiceID
 
-          DELETE FROM crctdr
-          WHERE  ctshop = @shopID AND
-                 cttxdt = @tranDate AND
-                 ctcrid = @crid AND
-                 ctinvo = @invoiceID    
+       DELETE FROM crctdr
+       WHERE  ctshop = @shopID AND
+              cttxdt = @tranDate AND
+              ctcrid = @crid AND
+              ctinvo = @invoiceID    
 
-          DELETE FROM crprop
-          WHERE  cpshop = @shopID AND
-                 cptxdt = @tranDate AND
-                 cpcrid = @crid AND
-                 cpinvo = @invoiceID
+       DELETE FROM crprop
+       WHERE  cpshop = @shopID AND
+              cptxdt = @tranDate AND
+              cpcrid = @crid AND
+              cpinvo = @invoiceID
 
-          DELETE FROM crsalh
-          WHERE  shshop = @shopID AND
-                 shtxdt = @tranDate AND
-                 shcrid = @crid AND
-                 shinvo = @invoiceID
-      END
+       DELETE FROM crsalh
+       WHERE  shshop = @shopID AND
+              shtxdt = @tranDate AND
+              shcrid = @crid AND
+              shinvo = @invoiceID
+END
 
-    SELECT @lnError    
+if @lnError >=0
+       BEGIN
+                 INSERT @return (
+                       ReturnID,
+                       ReturnMessage
+                       )
+                 VALUES (
+                       1, -- ReturnID - int
+                       '发票提交成功' -- ReturnMessage - varchar(256)
+                       );
+          END
+
+select a.ReturnID, a.ReturnMessage from @return a
 
 GO
 

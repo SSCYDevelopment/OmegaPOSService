@@ -115,7 +115,7 @@ AS
 
        print @lmCamt
        print @lmIamt
-       
+
     IF @lmCamt = @lmIamt  OR
        floor(@lmCamt) = floor(@lmIamt)  OR
        ceiling(@lmCamt) = ceiling(@lmIamt)  OR
@@ -485,37 +485,37 @@ AS
        --            WHERE  sdshop = @pcShop
        --      END
 
-          SELECT @lnError = 0
+          SELECT @lnError = 1
       END
     ELSE
-      SELECT @lnError = 1
+      SELECT @lnError = -1
 
-    IF @lnError = 1
+    IF @lnError < 0
       BEGIN
-       print 'error = 1'
-       --    DELETE FROM crsald
-       --    WHERE  sdshop = @shopID AND
-       --           sdtxdt = @TransDate AND
-       --           sdcrid = @crid AND
-       --           sdinvo = @invoiceID
+       --print 'error = 1'
+          DELETE FROM crsald
+          WHERE  sdshop = @shopID AND
+                 sdtxdt = @TransDate AND
+                 sdcrid = @crid AND
+                 sdinvo = @invoiceID
 
-       --    DELETE FROM crctdr
-       --    WHERE  ctshop = @shopID AND
-       --           cttxdt = @TransDate AND
-       --           ctcrid = @crid AND
-       --           ctinvo = @invoiceID
+          DELETE FROM crctdr
+          WHERE  ctshop = @shopID AND
+                 cttxdt = @TransDate AND
+                 ctcrid = @crid AND
+                 ctinvo = @invoiceID
 
-       --    DELETE FROM crprop
-       --    WHERE  cpshop = @shopID AND
-       --           cptxdt = @TransDate AND
-       --           cpcrid = @crid AND
-       --           cpinvo = @invoiceID
+          DELETE FROM crprop
+          WHERE  cpshop = @shopID AND
+                 cptxdt = @TransDate AND
+                 cpcrid = @crid AND
+                 cpinvo = @invoiceID
 
-       --    DELETE FROM crsalh
-       --    WHERE  shshop = @shopID AND
-       --           shtxdt = @TransDate AND
-       --           shcrid = @crid AND
-       --           shinvo = @invoiceID
+          DELETE FROM crsalh
+          WHERE  shshop = @shopID AND
+                 shtxdt = @TransDate AND
+                 shcrid = @crid AND
+                 shinvo = @invoiceID
       END
 
     SELECT @lnError
