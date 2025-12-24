@@ -413,32 +413,16 @@ BEGIN
        --          EXEC MPos_Crm01_InsertProperty @TransDate,@shopID,@crid,@invoiceID,'NOSTORHIST',@promotionID
        --      END
        DECLARE @iden CHAR(12)
-       -- 生成@iden: @shopID + 随机数字，确保总长度为12位；若已存在于crsalh.shiden则重试
-       DECLARE @shopTrim VARCHAR(12)
-       DECLARE @padLen INT
-       DECLARE @zeros VARCHAR(20)
+       -- 生成@iden: 仅使用随机数字，不再以shopID为前缀；若已存在于crsalh.shiden则重试
        DECLARE @randNumeric VARCHAR(20)
        DECLARE @attempts INT = 0
 
-       SET @shopTrim = RTRIM(@shopID)
-       SET @padLen = 12 - LEN(@shopTrim)
-       SET @zeros = REPLICATE('0', CASE 
-                            WHEN @padLen > 0
-                                   THEN @padLen
-                            ELSE 0
-                            END)
-
        WHILE 1 = 1
        BEGIN
-              IF @padLen > 0
-              BEGIN
-                     SET @randNumeric = RIGHT(@zeros + CAST(ABS(CHECKSUM(NEWID())) AS VARCHAR(20)), @padLen)
-                     SET @iden = LEFT(@shopTrim + @randNumeric, 12)
-              END
-              ELSE
-              BEGIN
-                     SET @iden = LEFT(@shopTrim, 12)
-              END
+              -- 生成长度为12的随机数字串（通过连接多个CHECKSUM(NEWID())结果提高随机性）
+              SET @randNumeric = RIGHT('000000000000' + CAST(ABS(CHECKSUM(NEWID())) AS VARCHAR(20))
+                                       + CAST(ABS(CHECKSUM(NEWID())) AS VARCHAR(20)), 12)
+              SET @iden = @randNumeric
 
               -- 若crsalh已有相同的shiden，则重试生成
               IF NOT EXISTS (
@@ -452,9 +436,10 @@ BEGIN
 
               IF @attempts >= 10
               BEGIN
-                     -- 若重试过多，使用不同的随机源后退出（避免死循环）
-                     SET @randNumeric = RIGHT(@zeros + CAST(ABS(CHECKSUM(NEWID())) AS VARCHAR(20)), @padLen)
-                     SET @iden = LEFT(@shopTrim + @randNumeric, 12)
+                     -- 若重试过多，最后再尝试一次不同随机源后退出（避免死循环）
+                     SET @randNumeric = RIGHT('000000000000' + CAST(ABS(CHECKSUM(NEWID())) AS VARCHAR(20))
+                                              + CAST(ABS(CHECKSUM(NEWID())) AS VARCHAR(20)), 12)
+                     SET @iden = @randNumeric
 
                      IF NOT EXISTS (
                                    SELECT 1
