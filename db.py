@@ -804,10 +804,67 @@ def SyncSavePrice(shopID: str, styleID: str, price: float, fromDate: str, toDate
         conn.close()
 
         return [dict(zip(columns, row)) for row in rows]
-
     except Exception as e:
         conn.rollback()
         raise e
+
+def GetInvoiceByIden(shopID: str, iden: str):
+    """Call stored procedure MPos_Crm01_GetInoviceByIden which returns multiple result sets:
+    1) crsalh (header)
+    2) crsald (details)
+    3) crctdr (payments)
+    4) crprop (properties)
+
+    Returns a dict with keys: `header`, `details`, `payments`, `props`, each is a list of dicts.
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_Crm01_GetInoviceByIden ?, ?"
+
+        try:
+            cursor.execute(sql, (shopID, iden))
+        except Exception as sql_ex:
+            logging.error(f"SQL Execute Error: {sql} | Params: {shopID}, {iden} | Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        result = {}
+        sets = ["header", "details", "payments", "props"]
+        idx = 0
+
+        while True:
+            columns = [col[0] for col in cursor.description] if cursor.description else []
+            rows = cursor.fetchall()
+            result_key = sets[idx] if idx < len(sets) else f"set_{idx}"
+            result[result_key] = [dict(zip(columns, row)) for row in rows]
+
+            idx += 1
+            if not cursor.nextset():
+                break
+
+        cursor.close()
+        conn.close()
+
+        return result
+
+    except Exception as e:
+        logging.error(f"GetInvoiceByIden error: Params=({shopID},{iden}) Error={str(e)}")
+        if cursor:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        raise e
+
+
 
 
 def InsertInvoiceProperty(pdTxdt: str, pdShop: str, pcCrid: str, pnInvo: int, pcProp: str, pcValue: str):

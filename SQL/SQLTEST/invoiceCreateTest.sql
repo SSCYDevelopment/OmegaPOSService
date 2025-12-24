@@ -89,7 +89,7 @@ EXEC MPos_Crm01_SaveCartItem @TransDate = '2025-12-17',
 	@Price = 71.07,
 	@OPrice = 100,
 	@Amnt = 71.07,
-	@OAmnt = 140,
+	@OAmnt = 100,
 	@Discount = 0,
 	@DiscountType = '',
 	@DiscountID = '',
@@ -235,33 +235,36 @@ EXEC MPos_Crm01_SubmitInvoice @marketID = 'CN',
 	@usePromotion = 'N'
 
 --查看创建出来的单据
+--获取发票号
+declare @InvoNo int
+select @InvoNo = max(shinvo) from crsalh where shtxdt='2025-12-17' and shshop='GZ86' and shcrid='999'
 SELECT *
 FROM crsalh
 WHERE shtxdt = '2025-12-17'
 	AND shshop = 'GZ86'
 	AND shcrid = '999'
-	AND shinvo = 1
+	AND shinvo = @InvoNo
 
 SELECT *
 FROM crsald
 WHERE sdtxdt = '2025-12-17'
 	AND sdshop = 'GZ86'
 	AND sdcrid = '999'
-	AND sdinvo = 1
+	AND sdinvo = @InvoNo
 
 SELECT *
 FROM crctdr
 WHERE cttxdt = '2025-12-17'
 	AND ctshop = 'GZ86'
 	AND ctcrid = '999'
-	AND ctinvo = 1
+	AND ctinvo = @InvoNo
 
 SELECT *
 FROM crprop
 WHERE cptxdt = '2025-12-17'
 	AND cpshop = 'GZ86'
 	AND cpcrid = '999'
-	AND cpinvo = 1
+	AND cpinvo = @InvoNo
 
 --获取货品总金额
 SELECT sum(CASE 
@@ -273,11 +276,13 @@ FROM crsald
 WHERE sdshop = 'GZ86'
 	AND sdtxdt = '2025-12-17'
 	AND sdcrid = '999'
-	AND sdinvo = 1
+	AND sdinvo = @InvoNo
 
 --把发票设置成为UPDATE(POSTED)状态
 EXEC MPos_Crm01_Update @shopID = 'GZ86',
 	@transDate = '2025-12-17',
 	@crid = '999',
-	@invoiceID = 1,
+	@invoiceID = @InvoNo,
 	@discountAmount = 0
+
+

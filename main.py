@@ -21,6 +21,7 @@ from db import DeleteInvoiceProperty
 from db import SyncSaveStyle
 from db import GetShift
 from db import NewInvo
+from db import GetInvoiceByIden
 from db import SyncSaveSku
 from db import SyncSavePrice
 import uvicorn
@@ -85,6 +86,22 @@ def read_root():
 @app.get("/items/{item_id}")
 def read_item(item_id: int, q: Union[str, None] = None):
     return {"item_id": item_id, "q": q}
+
+##获取发票信息
+@app.get("/invoice-by-iden")
+def api_get_invoice_by_iden(
+    shopID: str = Query(..., description="店铺编号（varchar）"),
+    iden: str = Query(..., description="识别码/凭证号（char）"),
+):
+    """调用存储过程 MPos_Crm01_GetInoviceByIden 并返回多个结果集的结构化数据。
+
+    返回格式：{ header: [...], details: [...], payments: [...], props: [...] }
+    """
+    try:
+        data = GetInvoiceByIden(shopID, iden)
+        return {"success": True, "count": sum(len(v) for v in data.values()), "data": data}
+    except Exception as e:
+        return {"success": False, "message": str(e), "data": None}
 
 ##获取可用折扣列表
 @app.get("/list-discount")
