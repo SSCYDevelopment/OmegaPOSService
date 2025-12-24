@@ -63,18 +63,19 @@ def api_member_lookup(
                     "mobile": data.get("strMobile") if isinstance(data, dict) else None,
                     "memberId": data.get("strNo") if isinstance(data, dict) else None,
                     "discount": 5,
+                    "points": 0,
                 }
             else:
-                return {"success": 0, "message": "未找到会员信息", "card": "", "mobile": "", "memberId": "", "discount": 0}
+                return {"success": 0, "message": "未找到会员信息", "card": "", "mobile": "", "memberId": "", "discount": 0, "points": 0}
 
         # SANSE会员/其他会员 - placeholder 实现
         elif memberType == "SANSEclub":
-            return {"success": 0, "message": "SANSE会员识别尚未实现", "card": "", "mobile": "", "memberId": "", "discount": 0}
+            return {"success": 0, "message": "SANSE会员识别尚未实现", "card": "", "mobile": "", "memberId": "", "discount": 0, "points": 0}
         else:
-            return {"success": 0, "message": "其他会员类型未实现", "card": "", "mobile": "", "memberId": "", "discount": 0}
+            return {"success": 0, "message": "其他会员类型未实现", "card": "", "mobile": "", "memberId": "", "discount": 0, "points": 0}
 
     except Exception as e:
-        return {"success": -1, "message": f"异常: {e}", "card": "", "mobile": "", "memberId": "", "discount": 0}
+        return {"success": -1, "message": f"异常: {e}", "card": "", "mobile": "", "memberId": "", "discount": 0, "points": 0}
 
 @app.get("/")
 def read_root():
