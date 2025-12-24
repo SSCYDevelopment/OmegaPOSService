@@ -9,7 +9,8 @@ from typing import Optional, Dict
 import config
 import time
 from GBModel import BaseResponse, FindMemberInfoBrandRequest, QueryXfkInfoRequest, PayWithXfkRequest, XfkWriteoffCancelRequest, GetXfkTradeConfirmInfoRequest, XfkSettlementRequest
-from GBModel import QueryByTmqRequest, PayWithTmqRequest, ReturnWithTmqRequest, GetTmqTradeConfirmInfoRequest, TmqSettlementRequest
+from GBModel import QueryByTmqRequest, PayWithTmqRequest, ReturnWithTmqRequest, GetTmqTradeConfirmInfoRequest, TmqSettlementRequest, GetSupplyInfo, BaseResponseByListData
+from GBModel import PointsQueryRequest, PointsDealRequest, PointsTradeQueryRequest, PointsSettlementRequest, EaccQueryBalanceRequest, EaccDealRequest, EaccGetTradeComfirmInfo, EaccDailySettlementRequest
 
 BASE_URL = config.GBAPI_CONFIG["BASE_URL"]
 APPID = config.GBAPI_CONFIG["APPID"]
@@ -40,13 +41,15 @@ def client_token():
     response = post(url=url, param=param)
     return response
 
-@gb_router.post("/reset-gbapi-token", response_model=BaseResponse)
+@gb_router.post("/reset-gbapi-token", summary="重置接口Token缓存", response_model=BaseResponse)
 def reset_gbapi_token():
     global TOKEN
+    global TOKEN_EXPIRE_TIME
     TOKEN = ""
+    TOKEN_EXPIRE_TIME = 0
 
 
-@gb_router.post("/find-member-info-brand", response_model=BaseResponse)
+@gb_router.post("/find-member-info-brand", summary="会员识别接口",  response_model=BaseResponse)
 def find_member_info_brand(request: FindMemberInfoBrandRequest = Body(...)):
     """
     会员识别接口
@@ -97,7 +100,7 @@ def find_member_info_brand(request: FindMemberInfoBrandRequest = Body(...)):
         )
 
 
-@gb_router.post("/query-xfk-info", response_model=BaseResponse)
+@gb_router.post("/query-xfk-info", summary="积分卡查询接口", response_model=BaseResponse)
 def query_xfk_info(request: QueryXfkInfoRequest = Body(...)):
     """
     积分卡查询接口
@@ -155,7 +158,7 @@ def query_xfk_info(request: QueryXfkInfoRequest = Body(...)):
         )
 
 
-@gb_router.post("/pay-with-xfk", response_model=BaseResponse)
+@gb_router.post("/pay-with-xfk", summary="积分卡核销接口", response_model=BaseResponse)
 def pay_with_xfk(request: PayWithXfkRequest = Body(...)):
     """
     积分卡核销接口
@@ -221,7 +224,7 @@ def pay_with_xfk(request: PayWithXfkRequest = Body(...)):
         )
 
 
-@gb_router.post("/xfk-writeoff-cancel", response_model=BaseResponse)
+@gb_router.post("/xfk-writeoff-cancel", summary="积分卡冲正接口", response_model=BaseResponse)
 def xfk_writeoff_cancel(request: XfkWriteoffCancelRequest = Body(...)):
     """
     积分卡冲正接口
@@ -289,7 +292,7 @@ def xfk_writeoff_cancel(request: XfkWriteoffCancelRequest = Body(...)):
         )
 
 
-@gb_router.post("/get-xfk-trade-comfirm-info", response_model=BaseResponse)
+@gb_router.post("/get-xfk-trade-comfirm-info", summary="积分卡交易确认接口", response_model=BaseResponse)
 def get_xfk_trade_comfirm_info(request: GetXfkTradeConfirmInfoRequest = Body(...)):
     """
     积分卡交易确认接口
@@ -345,17 +348,19 @@ def get_xfk_trade_comfirm_info(request: GetXfkTradeConfirmInfoRequest = Body(...
         )
 
 
-@gb_router.post("/xfk-settlement", response_model=BaseResponse)
+@gb_router.post("/xfk-settlement", summary="积分卡日结接口", response_model=BaseResponse)
 def xfk_settlement(request: XfkSettlementRequest = Body(...)):
     """
     积分卡日结接口
     接口说明：收款员交班时结算积分卡数据，汇总交易笔数及金额。广百、友谊积分卡需分两次结算。
 
-    Args:
+    Args:\n
         storeNo: 门店编号\n
         cashierId：收款员号\n
         terminalId：授权终端号，4位门店号+5位收款终端号\n
         vcardbrand：卡类型，201广百积分卡，202友谊积分卡\n
+        dh：日结单号，年月日+收款员号+序列号\n
+        companyCode：企业编码，GB：广百\n
     
     Returns:
         字典格式的响应数据或错误信息
@@ -368,6 +373,8 @@ def xfk_settlement(request: XfkSettlementRequest = Body(...)):
             "cashierId": request.cashierId,
             "terminalId": request.terminalId,
             "vcardbrand": request.vcardbrand,
+            "dh" : request.dh,
+            "companyCode" : request.companyCode,
         }
         result = gb_post(url, param)
         
@@ -399,7 +406,7 @@ def xfk_settlement(request: XfkSettlementRequest = Body(...)):
         )
 
 
-@gb_router.post("/query-by-tmq", response_model=BaseResponse)
+@gb_router.post("/query-by-tmq", summary="条码现金券查询接口", response_model=BaseResponse)
 def query_by_tmq(request: QueryByTmqRequest = Body(...)):
     """
     条码现金券查询接口
@@ -457,7 +464,7 @@ def query_by_tmq(request: QueryByTmqRequest = Body(...)):
         )
 
 
-@gb_router.post("/pay-with-tmq", response_model=BaseResponse)
+@gb_router.post("/pay-with-tmq", summary="条码现金券核销接口", response_model=BaseResponse)
 def pay_with_tmq(request: PayWithTmqRequest = Body(...)):
     """
     条码现金券核销接口
@@ -523,7 +530,7 @@ def pay_with_tmq(request: PayWithTmqRequest = Body(...)):
         )
 
 
-@gb_router.post("/return-with-tmq", response_model=BaseResponse)
+@gb_router.post("/return-with-tmq", summary="条码现金券冲正接口", response_model=BaseResponse)
 def return_with_tmq(request: ReturnWithTmqRequest = Body(...)):
     """
     条码现金券冲正接口
@@ -591,7 +598,7 @@ def return_with_tmq(request: ReturnWithTmqRequest = Body(...)):
         )
 
 
-@gb_router.post("/get-tmq-trade-confirm-info", response_model=BaseResponse)
+@gb_router.post("/get-tmq-trade-confirm-info", summary="条码现金券交易确认接口", response_model=BaseResponse)
 def get_tmq_trade_confirm_info(request: GetTmqTradeConfirmInfoRequest = Body(...)):
     """
     条码现金券交易确认接口
@@ -647,17 +654,19 @@ def get_tmq_trade_confirm_info(request: GetTmqTradeConfirmInfoRequest = Body(...
         )
 
 
-@gb_router.post("/tmq-settlement", response_model=BaseResponse)
+@gb_router.post("/tmq-settlement", summary="条码现金券日结接口", response_model=BaseResponse)
 def tmq_settlement(request: TmqSettlementRequest = Body(...)):
     """
     条码现金券日结接口
     接口说明：收款员交班时结算条码现金券数据，汇总交易笔数及金额。
 
-    Args:
+    Args:\n
         storeNo: 门店编号\n
         cashierId：收款员号\n
         terminalId：授权终端号，4位门店号+5位收款终端号\n
         vcardbrand：卡类型，201广百积分卡，202友谊积分卡\n
+        dh：日结单号，年月日+收款员号+序列号\n
+        companyCode：企业编码，GB：广百\n
     
     Returns:
         字典格式的响应数据或错误信息
@@ -670,6 +679,568 @@ def tmq_settlement(request: TmqSettlementRequest = Body(...)):
             "cashierId": request.cashierId,
             "terminalId": request.terminalId,
             "vcardbrand": request.vcardbrand,
+            "dh" : request.dh,
+            "companyCode" : request.companyCode,
+        }
+        result = gb_post(url, param)
+        
+        # 处理响应
+        if result["code"] == 1:
+            return BaseResponse(
+                success=True,
+                code=result["code"],
+                data=result.get("data"),
+                message=result.get("message", "成功")
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=BaseResponse(
+                    success=False,
+                    code=result["code"],
+                    message=result.get("message", "请求失败")
+                ).dict()
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=BaseResponse(
+                success=False,
+                code=-1,
+                message=f"接口调用异常: {str(e)}"
+            ).dict()
+        )
+
+
+@gb_router.post("/get-supply-info", summary="专柜数据接口", response_model=BaseResponseByListData)
+def get_supply_info(request: GetSupplyInfo = Body(...)):
+    """
+    专柜数据接口
+    接口说明：该接口可通过供应商编号查询广百侧定义的门店、商场、专柜、收款员数据，为后续订单推送、支付等业务提供基础数据。
+
+    Args:\n
+        supplyId: 供应商编号
+    
+    Returns:
+        字典格式的响应数据或错误信息
+    """
+    try:
+        # 解析参数并调用接口
+        url = BASE_URL + "/openapi/erp-api/gberp/outter/getSupplyInfo"
+        param = {
+            "supplyId": request.supplyId
+        }
+        result = gb_post(url, param)
+        
+        # 处理响应
+        if result["code"] == 1:
+            return BaseResponseByListData(
+                success=True,
+                code=result["code"],
+                data=result.get("data"),
+                message=result.get("message", "成功")
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=BaseResponse(
+                    success=False,
+                    code=result["code"],
+                    message=result.get("message", "请求失败")
+                ).dict()
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=BaseResponse(
+                success=False,
+                code=-1,
+                message=f"接口调用异常: {str(e)}"
+            ).dict()
+        )
+
+
+@gb_router.post("/points-query", summary="积分查询接口", response_model=BaseResponse)
+def points_query(request: PointsQueryRequest = Body(...)):
+    """
+    积分查询接口
+    接口说明：识别支付二维码，查询会员积分余额及使用规则，使用积分时需符号特定规则。
+    例如，人民币：积分兑换率为1：100，积分兑换倍数为10000，即积分支付只能为10000的倍数，对照到人民币即只能是100的倍数；最低起付为20000，即支付金额不能小于200；
+    当前可用积分为36849，即支付金额不能大于300。以上数值均为举例，具体数额需通过接口获取。
+
+    Args:\n
+        storeNo: 门店编号\n
+        orderNo：销售小票号\n
+        cashierId：收款员号\n
+        terminalId：授权终端号，4位门店号+5位收款终端号\n
+        bisCode：业态编码，801：百货\n
+        cardNo：会员卡号\n
+        companyCode：企业编码，GB：广百\n
+    
+    Returns:
+        字典格式的响应数据或错误信息
+    """
+    try:
+        # 解析参数并调用接口
+        url = BASE_URL + "/openapi/payment-api/memberPayment/points/query"
+        param = {
+            "storeNo": request.storeNo,
+            "orderNo": request.orderNo,
+            "cashierId": request.cashierId,
+            "terminalId": request.terminalId,
+            "bisCode": request.bisCode,
+            "cardNo": request.cardNo,
+            "companyCode": request.companyCode,
+        }
+        result = gb_post(url, param)
+        
+        # 处理响应
+        if result["code"] == 1:
+            return BaseResponse(
+                success=True,
+                code=result["code"],
+                data=result.get("data"),
+                message=result.get("message", "成功")
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=BaseResponse(
+                    success=False,
+                    code=result["code"],
+                    message=result.get("message", "请求失败")
+                ).dict()
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=BaseResponse(
+                success=False,
+                code=-1,
+                message=f"接口调用异常: {str(e)}"
+            ).dict()
+        )
+
+
+@gb_router.post("/points-deal", summary="积分支付、撤销、退货接口", response_model=BaseResponse)
+def points_deal(request: PointsDealRequest = Body(...)):
+    """
+    积分支付、撤销、退货接口
+    接口说明：识别支付二维码，积分支付时支付金额需符合特定规则，且一笔交易只能使用一次。若交易未完成，支持原路退回，支持售后退款，售后不支持撤销。
+
+    Args:\n
+        storeNo: 门店编号\n
+        orderNo：销售小票号\n
+        cashierId：收款员号\n
+        terminalId：授权终端号，4位门店号+5位收款终端号\n
+        amt：交易金额，均为正值\n
+        dealCode：支付二维码\n
+        cardNo：会员卡号\n
+        bisCode：业态编码，801：百货\n
+        type：业务类型，1-消费 2-撤销 3-售后退款\n
+        flag：增减类型，消费：-1，撤销或售后：1\n
+        posDate：支付时间\n
+        requestId：交易请求ID，一次交易行为的唯一标识\n
+        companyCode：企业编码，GB：广百\n
+        channelId：收款渠道\n
+        afterSaleNo：退货小票号\n
+    
+    Returns:
+        字典格式的响应数据或错误信息
+    """
+    try:
+        # 解析参数并调用接口
+        url = BASE_URL + "/openapi/payment-api/memberPayment/points/deal"
+        param = {
+            "storeNo": request.storeNo,
+            "orderNo": request.orderNo,
+            "cashierId": request.cashierId,
+            "terminalId": request.terminalId,
+            "amt": request.amt,
+            "dealCode": request.dealCode,
+            "cardNo": request.cardNo,
+            "bisCode": request.bisCode,
+            "type": request.type,
+            "flag": request.flag,
+            "posDate": request.posDate,
+            "requestId": request.requestId,
+            "companyCode": request.companyCode,
+            "channelId": request.channelId,
+            "afterSaleNo": request.afterSaleNo,
+        }
+        result = gb_post(url, param)
+        
+        # 处理响应
+        if result["code"] == 1:
+            return BaseResponse(
+                success=True,
+                code=result["code"],
+                data=result.get("data"),
+                message=result.get("message", "成功")
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=BaseResponse(
+                    success=False,
+                    code=result["code"],
+                    message=result.get("message", "请求失败")
+                ).dict()
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=BaseResponse(
+                success=False,
+                code=-1,
+                message=f"接口调用异常: {str(e)}"
+            ).dict()
+        )
+
+
+@gb_router.post("/points-tradeQuery", summary="积分支付交易确认接口", response_model=BaseResponse)
+def points_tradeQuery(request: PointsTradeQueryRequest = Body(...)):
+    """
+    积分支付交易确认接口
+    接口说明：可用于查询小票的交易信息，核对双方金额是否一致。
+
+    Args:\n
+        storeNo: 门店编号\n
+        orderNo：销售小票号\n
+        cashierId：收款员号\n
+        terminalId：授权终端号，4位门店号+5位收款终端号\n
+        bisCode：业态编码，801：百货\n
+        cardNo：会员卡号\n
+        companyCode：企业编码，GB：广百\n
+    
+    Returns:
+        字典格式的响应数据或错误信息
+    """
+    try:
+        # 解析参数并调用接口
+        url = BASE_URL + "/openapi/payment-api/memberPayment/points/tradeQuery"
+        param = {
+            "storeNo": request.storeNo,
+            "orderNo": request.orderNo,
+            "cashierId": request.cashierId,
+            "terminalId": request.terminalId,
+            "biscode": request.bisCode,
+            "cardNo": request.cardNo,
+            "companyCode": request.companyCode,
+        }
+        result = gb_post(url, param)
+        
+        # 处理响应
+        if result["code"] == 1:
+            return BaseResponse(
+                success=True,
+                code=result["code"],
+                data=result.get("data"),
+                message=result.get("message", "成功")
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=BaseResponse(
+                    success=False,
+                    code=result["code"],
+                    message=result.get("message", "请求失败")
+                ).dict()
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=BaseResponse(
+                success=False,
+                code=-1,
+                message=f"接口调用异常: {str(e)}"
+            ).dict()
+        )
+
+
+@gb_router.post("/points-settlement", summary="积分支付日结接口", response_model=BaseResponse)
+def points_settlement(request: PointsSettlementRequest = Body(...)):
+    """
+    积分支付日结接口
+    接口说明：收款员交班时结算积分支付数据，汇总交易笔数及金额。
+
+    Args:\n
+        storeNo: 门店编号\n
+        cashierId：收款员号\n
+        terminalId：授权终端号，4位门店号+5位收款终端号\n
+        bisCode：业态编码，801：百货\n
+        companyCode：企业编码，GB：广百\n
+        dh：日结单号，年月日+收款员号+序列号\n
+    
+    Returns:
+        字典格式的响应数据或错误信息
+    """
+    try:
+        # 解析参数并调用接口
+        url = BASE_URL + "/openapi/payment-api/memberPayment/points/settlement"
+        param = {
+            "storeNo": request.storeNo,
+            "cashierId": request.cashierId,
+            "terminalId": request.terminalId,
+            "biscode": request.bisCode,
+            "companyCode": request.companyCode,
+            "dh": request.dh,
+        }
+        result = gb_post(url, param)
+        
+        # 处理响应
+        if result["code"] == 1:
+            return BaseResponse(
+                success=True,
+                code=result["code"],
+                data=result.get("data"),
+                message=result.get("message", "成功")
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=BaseResponse(
+                    success=False,
+                    code=result["code"],
+                    message=result.get("message", "请求失败")
+                ).dict()
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=BaseResponse(
+                success=False,
+                code=-1,
+                message=f"接口调用异常: {str(e)}"
+            ).dict()
+        )
+
+
+@gb_router.post("/eacc-queryBalance", summary="电子账户查询接口", response_model=BaseResponse)
+def eacc_queryBalance(request: EaccQueryBalanceRequest = Body(...)):
+    """
+    电子账户查询接口
+    接口说明：识别支付二维码，查询电子账户余额。
+
+    Args:\n
+        storeNo: 门店编号\n
+        orderNo：销售小票号\n
+        cashierId：收款员号\n
+        terminalId：授权终端号，4位门店号+5位收款终端号\n
+        dealCode：支付二维码\n
+        cardNo：会员卡号\n
+        companyCode：企业编码，GB：广百\n
+    
+    Returns:
+        字典格式的响应数据或错误信息
+    """
+    try:
+        # 解析参数并调用接口
+        url = BASE_URL + "/openapi/payment-api/memberPayment/eacc/queryBalance"
+        param = {
+            "storeNo": request.storeNo,
+            "orderNo": request.orderNo,
+            "cashierId": request.cashierId,
+            "terminalId": request.terminalId,
+            "dealCode": request.dealCode,
+            "cardNo": request.cardNo,
+            "companyCode": request.companyCode,
+        }
+        result = gb_post(url, param)
+        
+        # 处理响应
+        if result["code"] == 1:
+            return BaseResponse(
+                success=True,
+                code=result["code"],
+                data=result.get("data"),
+                message=result.get("message", "成功")
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=BaseResponse(
+                    success=False,
+                    code=result["code"],
+                    message=result.get("message", "请求失败")
+                ).dict()
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=BaseResponse(
+                success=False,
+                code=-1,
+                message=f"接口调用异常: {str(e)}"
+            ).dict()
+        )
+
+
+@gb_router.post("/eacc-deal", summary="电子账户支付、撤销、退货接口", response_model=BaseResponse)
+def eacc_deal(request: EaccDealRequest = Body(...)):
+    """
+    电子账户支付、撤销、退货接口
+    接口说明：查询时缓存支付二维码，支付时直接获取，避免二次扫码。电子账户交易系统内部按优先级依次抵扣现金金额、积分卡金额、赠送金额，并返回对应的抵扣金额，
+    需根据抵扣金额拆分为三个支付方式。一笔交易只能使用一次。若交易未完成，支持原路退回，支持售后退款，售后不支持撤销。
+
+    Args:\n
+        storeNo: 门店编号\n
+        orderNo：销售小票号\n
+        cashierId：收款员号\n
+        terminalId：授权终端号，4位门店号+5位收款终端号\n
+        amt：交易金额，均为正值\n
+        dealCode：支付二维码\n
+        cardNo：会员卡号\n
+        bisCode：业态编码，801：百货\n
+        type：业务类型，5-消费 6-撤销 7-售后退款\n
+        flag：增减类型，消费：-1，撤销或售后：1\n
+        sysdate：支付时间\n
+        requestId：交易请求ID，一次交易行为的唯一标识\n
+        companyCode：企业编码，GB：广百\n
+        channelId：收款渠道\n
+        afterSaleNo：退货小票号\n
+    
+    Returns:
+        字典格式的响应数据或错误信息
+    """
+    try:
+        # 解析参数并调用接口
+        url = BASE_URL + "/openapi/payment-api/memberPayment/eacc/deal"
+        param = {
+            "storeNo": request.storeNo,
+            "orderNo": request.orderNo,
+            "cashierId": request.cashierId,
+            "terminalId": request.terminalId,
+            "amt": request.amt,
+            "dealCode": request.dealCode,
+            "cardNo": request.cardNo,
+            "bisCode": request.bisCode,
+            "type": request.type,
+            "flag": request.flag,
+            "sysdate": request.sysdate,
+            "requestId": request.requestId,
+            "companyCode": request.companyCode,
+            "channelId": request.channelId,
+            "afterSaleNo": request.afterSaleNo,
+        }
+
+        result = gb_post(url, param)
+        
+        # 处理响应
+        if result["code"] == 1:
+            return BaseResponse(
+                success=True,
+                code=result["code"],
+                data=result.get("data"),
+                message=result.get("message", "成功")
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=BaseResponse(
+                    success=False,
+                    code=result["code"],
+                    message=result.get("message", "请求失败")
+                ).dict()
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=BaseResponse(
+                success=False,
+                code=-1,
+                message=f"接口调用异常: {str(e)}"
+            ).dict()
+        )
+
+
+@gb_router.post("/eacc-get-trade-comfirm-info", summary="电子账户交易确认接口", response_model=BaseResponse)
+def eacc_get_trade_comfirm_info(request: EaccGetTradeComfirmInfo = Body(...)):
+    """
+    电子账户交易确认接口
+    接口说明：可用于查询小票的交易信息，核对双方金额是否一致。
+
+    Args:\n
+        storeNo: 门店编号\n
+        orderNo：销售小票号\n
+        cashierId：收款员号\n
+        terminalId：授权终端号，4位门店号+5位收款终端号\n
+        bisCode：业态编码，801：百货\n
+        flag：增减类型，消费：-1，撤销或售后：1\n
+        companyCode：企业编码，GB：广百\n
+    
+    Returns:
+        字典格式的响应数据或错误信息
+    """
+    try:
+        # 解析参数并调用接口
+        url = BASE_URL + "/openapi/payment-api/memberPayment/eacc/getTradeComfirmInfo"
+        param = {
+            "storeNo": request.storeNo,
+            "orderNo": request.orderNo,
+            "cashierId": request.cashierId,
+            "terminalId": request.terminalId,
+            "bisCode": request.bisCode,
+            "flag": request.flag,
+            "companyCode": request.companyCode,
+        }
+        result = gb_post(url, param)
+        
+        # 处理响应
+        if result["code"] == 1:
+            return BaseResponse(
+                success=True,
+                code=result["code"],
+                data=result.get("data"),
+                message=result.get("message", "成功")
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=BaseResponse(
+                    success=False,
+                    code=result["code"],
+                    message=result.get("message", "请求失败")
+                ).dict()
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=BaseResponse(
+                success=False,
+                code=-1,
+                message=f"接口调用异常: {str(e)}"
+            ).dict()
+        )
+
+
+@gb_router.post("/eacc-daily-Settlement", summary="电子账户日结接口", response_model=BaseResponse)
+def eacc_daily_Settlement(request: EaccDailySettlementRequest = Body(...)):
+    """
+    电子账户日结接口
+    接口说明：收款员交班时结算电子账户数据，汇总交易笔数及金额。
+
+    Args:\n
+        storeNo: 门店编号\n
+        cashierId：收款员号\n
+        terminalId：授权终端号，4位门店号+5位收款终端号\n
+        bisCode：业态编码，801：百货\n
+        companyCode：企业编码，GB：广百\n
+        dh：日结单号，年月日+收款员号+序列号\n
+    
+    Returns:
+        字典格式的响应数据或错误信息
+    """
+    try:
+        # 解析参数并调用接口
+        url = BASE_URL + "/openapi/payment-api/memberPayment/eacc/dailySettlement"
+        param = {
+            "storeNo": request.storeNo,
+            "cashierId": request.cashierId,
+            "terminalId": request.terminalId,
+            "bisCode": request.bisCode,
+            "dh": request.dh,
+            "companyCode": request.companyCode,
         }
         result = gb_post(url, param)
         
@@ -797,7 +1368,8 @@ def post(url: str, param: Optional[Dict[str, str]], headers: Optional[Dict[str, 
         
         # 解析 JSON 响应
         data = response.json()
-        if data.get("code") == 200 and data.get("subCode") == 1:
+        write_info_log(data)
+        if data.get("code") == 200 and (data.get("subCode") == 1 or data.get("subCode") == 6000):
             return get_api_response(1, "", data.get("data"))
         else:
             if data.get("code") != 200:
