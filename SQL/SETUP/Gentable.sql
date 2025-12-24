@@ -1,3 +1,275 @@
+/*
+--**--
+*  @name: mfmakt
+*  @category: Table
+*  @section: Master
+*  @type: Record
+*  @purpose: 全部市场纪录
+*  @parameter: mkmakt 编号
+*  @parameter: mkname 编号
+*  @parameter: mkcurr 货币
+*  @parameter: mkecom 公司名(英文)
+*  @parameter: mklcom 公司名 (长描述)
+*  @parameter: mkeadd 公司地址(英文)
+*  @parameter: mkladd 公司地址 (长描述)
+*  @parameter: mktele Telephone no.
+*  @parameter: mkfaxn Fax no.
+*  @parameter: mkhttp Giordano web site
+*  @parameter: mkserv Tiger web site
+*  @parameter: mkdbas Database server 
+*  @parameter: mkofee 运费等附加成本 JP = 0.18 
+*  @parameter: mkvatx VAT
+*  @parameter: mkiden ???
+*  @parameter: mkshpp 店铺代码前缀
+*  @parameter: mkpaym 是(Y)否有PAYMENT系统 
+*  @parameter: mksubc 是(Y)否有分公司在当地,判断是否可以由收货market出SO
+--**--
+*/
+Create Table mfmakt (mkmakt  char(2),
+                     mkname  nvarchar(50),
+                     mkcurr  char(3),
+                     mkecom  varchar(255),
+                     mklcom  nvarchar(255),
+                     mkeadd  varchar(255),
+                     mkladd  nvarchar(255),
+                     mktele  varchar(100),
+                     mkfaxn  varchar(100),
+                     mkhttp  varchar(100),
+                     mkserv  varchar(100),
+                     mkdbas  varchar(20),
+                     mkofee  decimal(9,4),   --- 运费等附加成本 JP = 0.18 
+                     mkvatx  decimal(5,2),
+                     mkiden  int,
+                     mkshpp  varchar(2),     ---店铺名字前缀
+                     mkpaym  char(1)  default 'Y',        ---是(Y)否有PAYMENT系统
+                     mksubc  char(1)  default 'Y',        ---是(Y)否有分公司在当地,判断是否可以由收货market出SO
+                     Primary key clustered (mkmakt))
+Go
+
+/*
+--**--
+*  @name: mfshop
+*  @category: Table
+*  @section: Master
+*  @type: Record
+*  @purpose: 店铺 
+*  @parameter: shshop 店铺代码
+*  @parameter: shmakt 所属市场
+*  @parameter: shedes 英文描述
+*  @parameter: shldes 长描述
+*  @parameter: shenam 英文
+*  @parameter: shlnam 本地语言
+*  @parameter: shaddr 地址
+*  @parameter: shrunc 所属公司
+*  @parameter: shfaxn Fax no.
+*  @parameter: shmail E-mail
+*  @parameter: shtele Telephone no.
+*  @parameter: shpost 邮政编码
+*  @parameter: shcity 所属城市
+*  @parameter: shtreg 转货区域
+*  @parameter: shtype 店铺类型 (A-韩国类型AD, D-Direct Shop, C-Counter, W-中国类型AD)
+*  @parameter: shstyp 店铺子类型 子类型（AD 1-店，2-Outlet；Direchshop 1-店，2-Outlet；Counter 1-Without Sales Agent，2-With Sales Agent）
+*  @parameter: shcent 数据中心 (Tiger AD)
+*  @parameter: shware 仓库类型 (W-Warehouse, S-Shop, H-Wholesale(AD 批发 153,163), V-Virtual, P- Personal(个人批发 151))
+*  @parameter: shdday 送货天数
+*  @parameter: shcanx 是否已取消
+--**--
+*/
+
+CREATE TABLE mfshop 
+    (shshop char(5),
+     shmakt char(2),
+     shedes nchar(40) ,
+     shldes nchar(40) ,
+     shenam nchar(10) ,
+     shlnam nchar(10) , 
+     shaddr nchar(200),
+     shrunc nchar(40),
+     shfaxn char(20),
+     shmail char(50),
+     shtele char(20),
+     shpost char(10),
+     shcity char(4),
+     shtreg char(5),
+     shtype char(1), -- (A-韩国类型AD, D-Direct Shop, C-Counter, W-中国类型AD,  F -厂商)
+     shstyp char(1) default 1, -- 子类型（AD 1-店，2-Outlet；Direchshop 1-店，2-Outlet；Counter 1-Without Sales Agent，2-With Sales Agent）
+     shcent char(1),
+     shware char(1), -- (W-Warehouse, S-Shop, H-Wholesale(AD 批发 153,163), V-Virtual, P- Personal(个人批发 151))
+     shdday smallint default 1, --送货天数
+     shcanx char(1) default'',
+     primary key clustered(shshop),
+     foreign key (shmakt)  references mfmakt(mkmakt))
+go
+
+
+
+/*
+--**--
+*  @name: mfbrnd
+*  @category: Table
+*  @section: Master
+*  @type: Record
+*  @purpose: 品牌 
+*  @parameter: brbran 品牌
+*  @parameter: bredes 品牌(英文) 
+*  @parameter: brldes 品牌(长描述)
+*  @parameter: brshop 店铺代码
+*  @parameter: brbitn 店铺Bit 1=M&M
+*  @parameter: brstyl 品牌款式前缀 01=M&M
+--**--
+*/
+CREATE TABLE mfbrnd
+(
+   brbran char( 3 ),
+   bredes nchar( 20 ),
+   brldes nchar( 20 ),
+   brshop char( 1 ),
+   brbitn int,--1=GIO 2=LAD 4=KID 8=BLS 
+   brstyl char( 2 ),
+   PRIMARY KEY CLUSTERED(brbran)
+)
+Go 
+/*
+--**--
+*  @name: mfcate
+*  @category: Table
+*  @section: Master
+*  @type: Record
+*  @purpose: Category
+*  @parameter: caedes CAT(英文)
+*  @parameter: caldes CAT(长描述)
+*  @parameter: caline Line 下属
+--**--
+*/
+Create Table mfcate 
+(
+     cacate char(2),
+     caedes nchar(50),
+     caldes nchar(50),
+     caline char(3),
+     Primary Key Clustered(cacate),
+)
+Go
+
+/*
+--**--
+*  @name: mfline
+*  @category: Table
+*  @section: Master
+*  @type: Record
+*  @purpose: 没有用
+*  @parameter: 
+--**--
+*/
+Create Table mfline 
+(
+      lnline char(3),
+      lnedes nchar(50),
+      lnldes nchar(50),
+      primary key clustered(lnline),
+) 
+Go
+
+/*
+--**--
+*  @name: mfstyl
+*  @category: Table
+*  @section: Master
+*  @type: Record
+*  @purpose: Style
+*  @parameter: smstyl 款式(15位)
+*  @parameter: smcode 款式(15位)
+*  @parameter: smedes 款式(英文)
+*  @parameter: smldes 款式(长描述)
+*  @parameter: smbran 品牌
+*  @parameter: sccate Category
+*  @parameter: smline Line
+*  @parameter: smseas 季节
+*  @parameter: smsprc 原始价
+*  @parameter: smcore Core 1 - 创作部物料   2 - 购物包  6 -  购物券  C ，I -  货品 , smcate ='00' and (smcore='1' or smcore='2' or smcore='3' or smcore='4' or smcore='5') 不计算库存  
+*  @parameter: smyear 年份
+*  @parameter: smcanx 是否已取消
+--**--
+*/
+Create Table mfstyl
+    (smstyl char(15),
+     smcode CHAR(15),
+     smedes nchar(50),
+     smldes nchar(50),
+     smbran char(3),
+     smcate char(2),
+     smline char(3),
+     smseas char(1),
+     smsprc money,
+     smcore char(1),  -- 1 - 创作部物料   2 - 购物包  6 -  购物券  C ，I -  货品 , smcate ='00' and (smcore='1' or smcore='2' or smcore='3' or smcore='4' or smcore='5') 不计算库存  
+     smyear smalldatetime,
+     smcanx char(1),
+     Primary Key Clustered(smstyl),
+     foreign Key (smbran) references mfbrnd(brbran),
+     foreign key (smcate) references mfcate(cacate),
+     foreign key (smline) references mfline(lnline))
+Go
+Create Index mfstyl1 on mfstyl(smcode) 
+Go
+
+
+/*
+--**--
+*  @name: mfskun
+*  @category: Table
+*  @section: Master
+*  @type: Record
+*  @purpose: SKU主档案
+*  @parameter: skstyl 款式
+*  @parameter: skcolr 颜色
+*  @parameter: sksize Size
+*  @parameter: skskun SKU
+--**--
+*/
+Create Table mfskun
+    (skstyl char(15),
+     skcolr char(3),
+     sksize char(3),
+     skskun char(21),
+     primary key clustered(skskun),
+     foreign key (skstyl) references mfstyl(smstyl))
+Go
+CREATE UNIQUE INDEX mfskun1 ON mfskun (skstyl, skcolr, sksize)
+go
+
+/*
+--**--
+*  @name: mftdrt
+*  @category: Table
+*  @section: Master
+*  @type: Record
+*  @purpose: 付款方式
+*  @parameter: tdmakt 市场
+*  @parameter: tdtdrt 付款方式
+*  @parameter: tdldes 付款方式英文描述
+*  @parameter: tdedes 付款方式长描述
+*  @parameter: tdcurr 货币
+*  @parameter: tdshct Short cut
+*  @parameter: tdctyp 信用卡类型，用于与读卡机联系
+*  @parameter: tdtype 类型(1 - 不计算销售额; 2 - 不计算销售税; 4 - 储值卡; 8 - 银行卡（包括信用卡）; 
+                           16 - Coupon; 32 - 用于退款; 64 - 需要输入卡号; 128 - 使用积分)
+*  @parameter: tdcanx 是否取消
+--**--
+*/
+Create Table mftdrt 
+       (tdmakt char(2), 
+        tdtdrt char(1),
+        tdldes nchar(30),
+        tdedes char(30),
+        tdcurr char(3),
+        tdshct int,
+        tdtype int default 0,
+        tdctyp char(2) default '',
+        tdcanx char(1) default 'N',
+        primary key clustered(tdmakt, tdtdrt),
+        foreign key (tdmakt) references mfmakt(mkmakt))
+go
+
 CREATE TABLE dbo.crcart
 (
    TransDate        smalldatetime,
@@ -127,32 +399,7 @@ CREATE TABLE mfutkn
 ); 
 
 
-/*
---**--
-*  @name: mfbrnd
-*  @category: Table
-*  @section: Master
-*  @type: Record
-*  @purpose: 品牌 
-*  @parameter: brbran 品牌
-*  @parameter: bredes 品牌(英文) 
-*  @parameter: brldes 品牌(长描述)
-*  @parameter: brshop 店铺代码
-*  @parameter: brbitn 店铺Bit 1=M&M
-*  @parameter: brstyl 品牌款式前缀 01=M&M
---**--
-*/
-CREATE TABLE mfbrnd
-(
-   brbran char( 3 ),
-   bredes nchar( 20 ),
-   brldes nchar( 20 ),
-   brshop char( 1 ),
-   brbitn int,--1=GIO 2=LAD 4=KID 8=BLS 
-   brstyl char( 2 ),
-   PRIMARY KEY CLUSTERED(brbran)
-)
-Go 
+
 
 
 Create Table crsalh (shtxdt smalldatetime,
@@ -192,6 +439,7 @@ Go
 *  @parameter: sdprom Promotion ID
 --**--
 */
+
 Create Table crsald (sdtxdt smalldatetime,
                      sdshop char(5),
                      sdcrid char(3),
@@ -201,6 +449,7 @@ Create Table crsald (sdtxdt smalldatetime,
                      sdskun char(21),
                      sdsprc money,
                      sdtqty int,
+                     sdwght money,
                      sddsct money,
                      sdvata money,
                      sddscd char(2) default'',
@@ -246,38 +495,6 @@ Create Table crctdr (cttxdt smalldatetime,
                      Foreign key (ctmakt, ctcurr) References mfcurr(cumakt, cucurr),
                      Primary Key Clustered (cttxdt, ctshop, ctcrid, ctinvo, ctmakt, cttdrt, ctcrdn, ctcurr))
 Go
-/*
---**--
-*  @name: mftdrt
-*  @category: Table
-*  @section: Master
-*  @type: Record
-*  @purpose: 付款方式
-*  @parameter: tdmakt 市场
-*  @parameter: tdtdrt 付款方式
-*  @parameter: tdldes 付款方式英文描述
-*  @parameter: tdedes 付款方式长描述
-*  @parameter: tdcurr 货币
-*  @parameter: tdshct Short cut
-*  @parameter: tdctyp 信用卡类型，用于与读卡机联系
-*  @parameter: tdtype 类型(1 - 不计算销售额; 2 - 不计算销售税; 4 - 储值卡; 8 - 银行卡（包括信用卡）; 
-                           16 - Coupon; 32 - 用于退款; 64 - 需要输入卡号; 128 - 使用积分)
-*  @parameter: tdcanx 是否取消
---**--
-*/
-Create Table mftdrt 
-       (tdmakt char(2), 
-        tdtdrt char(1),
-        tdldes nchar(30),
-        tdedes char(30),
-        tdcurr char(3),
-        tdshct int,
-        tdtype int default 0,
-        tdctyp char(2) default '',
-        tdcanx char(1) default 'N',
-        primary key clustered(tdmakt, tdtdrt),
-        foreign key (tdmakt) references mfmakt(mkmakt))
-go
 
 
 

@@ -24,10 +24,57 @@ from db import NewInvo
 from db import SyncSaveSku
 from db import SyncSavePrice
 import uvicorn
-from GBAPI import gb_router
+from GBAPI import gb_router, find_member_info_brand
+from GBModel import FindMemberInfoBrandRequest
 
 app = FastAPI()
 app.include_router(gb_router)
+
+
+@app.get("/member-lookup")
+def api_member_lookup(
+    memberType: str = Query(..., description="会员类型: 广百会员,SANSE会员,其他会员"),
+    identifier: str = Query(..., description="会员识别号: 会员卡号/会员码/手机号"),
+):
+    try:
+        # 广百会员调用 GBAPI.find_member_info_brand
+        if memberType == "GBMember":
+            req = FindMemberInfoBrandRequest(strCustomer=identifier)
+            resp = find_member_info_brand(req)
+
+            # 支持函数直接返回 Pydantic BaseResponse 或 dict
+            data = None
+            message = ""
+            success_flag = 0
+            if hasattr(resp, "data"):
+                data = getattr(resp, "data")
+                message = getattr(resp, "message", "")
+                success_flag = 1 if getattr(resp, "success", False) else 0
+            elif isinstance(resp, dict):
+                data = resp.get("data")
+                message = resp.get("message", "")
+                success_flag = 1 if resp.get("code") == 1 else 0
+
+            if data:
+                return {
+                    "success": 1,
+                    "message": message or "成功",
+                    "card": data.get("strCard") if isinstance(data, dict) else None,
+                    "mobile": data.get("strMobile") if isinstance(data, dict) else None,
+                    "memberId": data.get("strNo") if isinstance(data, dict) else None,
+                    "discount": 5,
+                }
+            else:
+                return {"success": 0, "message": "未找到会员信息", "card": "", "mobile": "", "memberId": "", "discount": 0}
+
+        # SANSE会员/其他会员 - placeholder 实现
+        elif memberType == "SANSEclub":
+            return {"success": 0, "message": "SANSE会员识别尚未实现", "card": "", "mobile": "", "memberId": "", "discount": 0}
+        else:
+            return {"success": 0, "message": "其他会员类型未实现", "card": "", "mobile": "", "memberId": "", "discount": 0}
+
+    except Exception as e:
+        return {"success": -1, "message": f"异常: {e}", "card": "", "mobile": "", "memberId": "", "discount": 0}
 
 @app.get("/")
 def read_root():
@@ -487,6 +534,8 @@ def api_sync_save_price(
         except Exception:
             count = 1
     return {"success": True, "count": count, "data": data}
+
+
 
 
 if __name__ == "__main__":
