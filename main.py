@@ -26,6 +26,8 @@ from db import SyncSaveSku
 from db import SyncSavePrice
 from db import GetReceiptData
 from db import GetMemberTypies
+from db import GetCrid
+
 import uvicorn
 from GBAPI import gb_router, find_member_info_brand, points_query
 from GBModel import FindMemberInfoBrandRequest, PointsQueryRequest
@@ -596,7 +598,7 @@ def api_sync_save_price(
             count = 1
     return {"success": True, "count": count, "data": data}
 
-
+# 获取打印小票数据 调用储存过程 MPos_Crm01_GetReceiptData
 @app.get("/get-receipt-data")
 def api_sync_save_price(
     shopID: str = Query(..., description="店铺代码（varchar(10)），例如门店编号"),
@@ -605,7 +607,19 @@ def api_sync_save_price(
 ):
     data = GetReceiptData(shopID, crid, invo)
     return data
-    
+
+
+## 获取机器号（调用存储过程 MPos_Public_CreateCrid
+@app.get("/get-crid")
+def api_get_crid(
+    shopid: str = Query(..., description="店铺代码（char(5)）"),
+    machine: str = Query(..., description="设备唯一码"),
+):
+    crid = GetCrid(shopid, machine)
+    if crid is None:
+        return {"success": True, "count": 0, "data": None}
+    return {"success": True, "count": 1, "data": crid}
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8081)

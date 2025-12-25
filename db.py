@@ -989,7 +989,7 @@ def GetReceiptData(shopID : str, crid : str, invo : str):
         conn = get_connection()
         cursor = conn.cursor()
 
-        sql = "EXEC MPos_Public_GetReceiptData ?, ?, ?"
+        sql = "EXEC MPos_Crm01_GetReceiptData ?, ?, ?"
 
         # result_sets = []
 
@@ -1075,3 +1075,32 @@ def GetReceiptData(shopID : str, crid : str, invo : str):
             cursor.close()
         if conn:
             conn.close()
+
+
+def GetCrid(shopID: str, machine: str):
+    """
+    根据店铺ID和设备ID获取机器号
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_Public_CreateCrid ?, ?"
+
+        try:
+            cursor.execute(sql, (shopID, machine))
+        except Exception as sql_ex:
+            logging.error(f"SQL Execute Error: {sql} | Params: {shopID}, {machine}| Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        row = cursor.fetchone()
+
+        cursor.close()
+        conn.close()
+
+        if row:
+            return row[0]
+        return None
+
+    except Exception as e:
+        raise e
