@@ -1,4 +1,4 @@
-CREATE PROCEDURE dbo.MPos_Public_GetReceiptData
+CREATE PROCEDURE dbo.MPos_Crm01_GetReceiptData
    @pShopid varchar(21),
    @pCrid   char(3),
    @pInvo   int
