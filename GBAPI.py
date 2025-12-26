@@ -2,8 +2,9 @@
 广百API接口模块
 广百API调用
 """
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, HTTPException, Query
 from datetime import datetime
+import fastapi
 import requests
 import json
 import uuid
@@ -44,7 +45,8 @@ def get_gb_config(shopid:str, crid:str):
 
 # 获取每次接口请求的requestid
 def get_request_id():
-    return uuid.uuid4()
+    # 广百接口request_id最大长度是32
+    return str(uuid.uuid4()).replace('-','')
 
 
 # 获取日结时的日结单号
@@ -109,14 +111,17 @@ def reset_gb_config():
     StoreConfig = {}
 
 
-@gb_router.post("/find-member-info-brand", summary="会员识别接口",  response_model=BaseResponse)
-def find_member_info_brand(request: FindMemberInfoBrandRequest = Body(...)):
+@gb_router.get("/find-member-info-brand", summary="会员识别接口",  response_model=BaseResponse)
+#def find_member_info_brand(request: FindMemberInfoBrandRequest = Body(...)):
+def find_member_info_brand(
+    memberNo: str = Query(..., description="会员卡号/会员码/手机号"),
+    ):
     """
     会员识别接口
     接口说明：识别广百会员身份，以及获取会员基本信息。
 
     Args:
-        strCustomer: 会员卡号/会员码/手机号
+        memberNo: 会员卡号/会员码/手机号
     
     Returns:
         字典格式的响应数据或错误信息
@@ -127,7 +132,7 @@ def find_member_info_brand(request: FindMemberInfoBrandRequest = Body(...)):
         url = BASE_URL + "/openapi/member-api/memberApi/findmemberinfobrand"
         param = {
             "data": {
-                "strCustomer" : request.strCustomer
+                "strCustomer" : memberNo
             },
         }
         result = gb_post(url, param)
@@ -141,22 +146,18 @@ def find_member_info_brand(request: FindMemberInfoBrandRequest = Body(...)):
                 message=result.get("message", "成功")
             )
         else:
-            raise HTTPException(
-                status_code=400,
-                detail=BaseResponse(
-                    success=False,
-                    code=result["code"],
-                    message=result.get("message", "请求失败")
-                ).dict()
+            return BaseResponse(
+                success=False,
+                code=result["code"],
+                data=None,
+                message=result.get("message", "请求失败")
             )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=BaseResponse(
-                success=False,
-                code=-1,
-                message=f"接口调用异常: {str(e)}"
-            ).dict()
+        return BaseResponse(
+            success=False,
+            code=-1,
+            data=None,
+            message=f"接口调用异常: {str(e)}"
         )
 
 
@@ -820,8 +821,13 @@ def get_supply_info(request: GetSupplyInfo = Body(...)):
         )
 
 
-@gb_router.post("/points-query", summary="积分查询接口", response_model=BaseResponse)
-def points_query(request: PointsQueryRequest = Body(...)):
+@gb_router.get("/points-query", summary="积分查询接口", response_model=BaseResponse)
+# def points_query(request: PointsQueryRequest = Body(...)):
+def points_query(
+    shopID: str = Query(..., description="门店编号"),
+    crid: str = Query(..., description="机器号"),
+    memberNo: str = Query(..., description="会员卡号"),
+):
     """
     积分查询接口
     接口说明：识别支付二维码，查询会员积分余额及使用规则，使用积分时需符号特定规则。
@@ -837,7 +843,7 @@ def points_query(request: PointsQueryRequest = Body(...)):
         字典格式的响应数据或错误信息
     """
     try:
-        if not request.Shopid:
+        if not shopID:
             return BaseResponse(
                 success=False,
                 code=0,
@@ -845,7 +851,7 @@ def points_query(request: PointsQueryRequest = Body(...)):
                 message='店铺ID不能为空'
             )
 
-        if not request.Crid:
+        if not crid:
             return BaseResponse(
                 success=False,
                 code=0,
@@ -853,14 +859,14 @@ def points_query(request: PointsQueryRequest = Body(...)):
                 message='设备ID不能为空'
             )
 
-        shopConfig = get_gb_config(request.Shopid, request.Crid)
+        shopConfig = get_gb_config(shopID, crid)
 
         if not shopConfig:
             return BaseResponse(
                 success=False,
                 code=0,
                 data=None,
-                message=f'获取店铺_机器配置为空，请检查店铺配置[{request.Shopid}|{request.Crid}]'
+                message=f'获取店铺_机器配置为空，请检查店铺配置[{shopID}|{crid}]'
             )
 
         # 解析参数并调用接口
@@ -871,7 +877,7 @@ def points_query(request: PointsQueryRequest = Body(...)):
             "cashierId": shopConfig['cashierId'],
             "terminalId": shopConfig['storeNo'] + shopConfig['terminalId'],
             "bisCode": '801',
-            "cardNo": request.MemberCard,
+            "cardNo": memberNo,
             "companyCode": 'GB',
         }
         result = gb_post(url, param)
@@ -885,27 +891,34 @@ def points_query(request: PointsQueryRequest = Body(...)):
                 message=result.get("message", "成功")
             )
         else:
-            raise HTTPException(
-                status_code=400,
-                detail=BaseResponse(
-                    success=False,
-                    code=result["code"],
-                    message=result.get("message", "请求失败")
-                ).dict()
+            return BaseResponse(
+                success=False,
+                code=result["code"],
+                data=None,
+                message=result.get("message", "请求失败")
             )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=BaseResponse(
-                success=False,
-                code=-1,
-                message=f"接口调用异常: {str(e)}"
-            ).dict()
+        return BaseResponse(
+            success=False,
+            code=-1,
+            data=None,
+            message=f"接口调用异常: {str(e)}"
         )
 
 
-@gb_router.post("/points-deal", summary="积分支付、撤销、退货接口", response_model=BaseResponse)
-def points_deal(request: PointsDealRequest = Body(...)):
+@gb_router.get("/points-deal", summary="积分支付、撤销、退货接口", response_model=BaseResponse)
+# def points_deal(request: PointsDealRequest = Body(...)):
+def points_deal(
+    Shopid: str = Query(..., description="门店编号"),
+    Crid: str = Query(..., description="机器号"),
+    InvoiceNo: str = Query(..., description="广百（广百格式）销售小票号"),
+    Amnt: float = Query(..., description="交易金额，均为正值"),
+    DealCode: str = Query(..., description="支付二维码"),
+    MemberCard: str = Query(..., description="会员卡号"),
+    Type: int = Query(..., description="业务类型，1-消费 2-撤销 3-售后退款"),
+    Shtxdt: str = Query(..., description="支付时间"),
+    ReturnInvoiceNo: str = Query(None, description="退货小票号"),
+):
     """
     积分支付、撤销、退货接口
     接口说明：识别支付二维码，积分支付时支付金额需符合特定规则，且一笔交易只能使用一次。若交易未完成，支持原路退回，支持售后退款，售后不支持撤销。
@@ -925,7 +938,7 @@ def points_deal(request: PointsDealRequest = Body(...)):
         字典格式的响应数据或错误信息
     """
     try:
-        if not request.Shopid:
+        if not Shopid:
             return BaseResponse(
                 success=False,
                 code=0,
@@ -933,7 +946,7 @@ def points_deal(request: PointsDealRequest = Body(...)):
                 message='店铺ID不能为空'
             )
 
-        if not request.Crid:
+        if not Crid:
             return BaseResponse(
                 success=False,
                 code=0,
@@ -941,34 +954,34 @@ def points_deal(request: PointsDealRequest = Body(...)):
                 message='设备ID不能为空'
             )
 
-        shopConfig = get_gb_config(request.Shopid, request.Crid)
+        shopConfig = get_gb_config(Shopid, Crid)
 
         if not shopConfig:
             return BaseResponse(
                 success=False,
                 code=0,
                 data=None,
-                message=f'获取店铺_机器配置为空，请检查店铺配置[{request.Shopid}|{request.Crid}]'
+                message=f'获取店铺_机器配置为空，请检查店铺配置[{Shopid}|{Crid}]'
             )
 
         # 解析参数并调用接口
         url = BASE_URL + "/openapi/payment-api/memberPayment/points/deal"
         param = {
             "storeNo": shopConfig['storeNo'],
-            "orderNo": request.InvoiceNo,
+            "orderNo": InvoiceNo,
             "cashierId": shopConfig['cashierId'],
             "terminalId": shopConfig['storeNo'] + shopConfig['terminalId'],
-            "amt": request.Amnt,
-            "dealCode": request.DealCode,
-            "cardNo": request.MemberCard,
+            "amt": Amnt,
+            "dealCode": DealCode,
+            "cardNo": MemberCard,
             "bisCode": '801',
-            "type": request.Type,
-            "flag":  -1 if request.Type == 1 else 1,
-            "posDate": request.Shtxdt,
+            "type": Type,
+            "flag":  -1 if Type == 1 else 1,
+            "posDate": Shtxdt,
             "requestId": get_request_id(),
             "companyCode": 'GB',
             "channelId": '31',
-            "afterSaleNo": request.ReturnInvoiceNo,
+            "afterSaleNo": ReturnInvoiceNo,
         }
         result = gb_post(url, param)
         
@@ -981,27 +994,29 @@ def points_deal(request: PointsDealRequest = Body(...)):
                 message=result.get("message", "成功")
             )
         else:
-            raise HTTPException(
-                status_code=400,
-                detail=BaseResponse(
-                    success=False,
-                    code=result["code"],
-                    message=result.get("message", "请求失败")
-                ).dict()
+            return BaseResponse(
+                success=False,
+                code=result["code"],
+                data=None,
+                message=result.get("message", "请求失败")
             )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=BaseResponse(
-                success=False,
-                code=-1,
-                message=f"接口调用异常: {str(e)}"
-            ).dict()
+        return BaseResponse(
+            success=False,
+            code=-1,
+            data=None,
+            message=f"接口调用异常: {str(e)}"
         )
 
 
-@gb_router.post("/points-tradeQuery", summary="积分支付交易确认接口", response_model=BaseResponse)
-def points_tradeQuery(request: PointsTradeQueryRequest = Body(...)):
+@gb_router.get("/points-tradeQuery", summary="积分支付交易确认接口", response_model=BaseResponse)
+#def points_tradeQuery(request: PointsTradeQueryRequest = Body(...)):
+def points_tradeQuery(
+    Shopid: str = Query(..., description="门店编号"),
+    Crid: str = Query(..., description="机器号"),
+    InvoiceNo: str = Query(..., description="销售小票号"),
+    MemberCard: str = Query(..., description="会员卡号"),
+):
     """
     积分支付交易确认接口
     接口说明：可用于查询小票的交易信息，核对双方金额是否一致。
@@ -1016,7 +1031,7 @@ def points_tradeQuery(request: PointsTradeQueryRequest = Body(...)):
         字典格式的响应数据或错误信息
     """
     try:
-        if not request.Shopid:
+        if not Shopid:
             return BaseResponse(
                 success=False,
                 code=0,
@@ -1024,7 +1039,7 @@ def points_tradeQuery(request: PointsTradeQueryRequest = Body(...)):
                 message='店铺ID不能为空'
             )
 
-        if not request.Crid:
+        if not Crid:
             return BaseResponse(
                 success=False,
                 code=0,
@@ -1032,25 +1047,25 @@ def points_tradeQuery(request: PointsTradeQueryRequest = Body(...)):
                 message='设备ID不能为空'
             )
 
-        shopConfig = get_gb_config(request.Shopid, request.Crid)
+        shopConfig = get_gb_config(Shopid, Crid)
 
         if not shopConfig:
             return BaseResponse(
                 success=False,
                 code=0,
                 data=None,
-                message=f'获取店铺_机器配置为空，请检查店铺配置[{request.Shopid}|{request.Crid}]'
+                message=f'获取店铺_机器配置为空，请检查店铺配置[{Shopid}|{Crid}]'
             )
 
         # 解析参数并调用接口
         url = BASE_URL + "/openapi/payment-api/memberPayment/points/tradeQuery"
         param = {
             "storeNo": shopConfig['storeNo'],
-            "orderNo": request.InvoiceNo,
+            "orderNo": InvoiceNo,
             "cashierId": shopConfig['cashierId'],
             "terminalId": shopConfig['storeNo'] + shopConfig['terminalId'],
             "biscode": '801',
-            "cardNo": request.MemberCard,
+            "cardNo": MemberCard,
             "companyCode": 'GB',
         }
         result = gb_post(url, param)
@@ -1064,27 +1079,28 @@ def points_tradeQuery(request: PointsTradeQueryRequest = Body(...)):
                 message=result.get("message", "成功")
             )
         else:
-            raise HTTPException(
-                status_code=400,
-                detail=BaseResponse(
-                    success=False,
-                    code=result["code"],
-                    message=result.get("message", "请求失败")
-                ).dict()
+            return BaseResponse(
+                success=False,
+                code=result["code"],
+                data=None,
+                message=result.get("message", "请求失败")
             )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=BaseResponse(
-                success=False,
-                code=-1,
-                message=f"接口调用异常: {str(e)}"
-            ).dict()
+        return BaseResponse(
+            success=False,
+            code=-1,
+            data=None,
+            message=f"接口调用异常: {str(e)}"
         )
 
 
-@gb_router.post("/points-settlement", summary="积分支付日结接口", response_model=BaseResponse)
-def points_settlement(request: PointsSettlementRequest = Body(...)):
+@gb_router.get("/points-settlement", summary="积分支付日结接口", response_model=BaseResponse)
+# def points_settlement(request: PointsSettlementRequest = Body(...)):
+def points_settlement(
+    Shopid: str = Query(..., description="门店编号"),
+    Crid: str = Query(..., description="机器号"),
+    SettlementCnt: str = Query(..., description="日结次数"),
+):
     """
     积分支付日结接口
     接口说明：收款员交班时结算积分支付数据，汇总交易笔数及金额。
@@ -1098,7 +1114,7 @@ def points_settlement(request: PointsSettlementRequest = Body(...)):
         字典格式的响应数据或错误信息
     """
     try:
-        if not request.Shopid:
+        if not Shopid:
             return BaseResponse(
                 success=False,
                 code=0,
@@ -1106,7 +1122,7 @@ def points_settlement(request: PointsSettlementRequest = Body(...)):
                 message='店铺ID不能为空'
             )
 
-        if not request.Crid:
+        if not Crid:
             return BaseResponse(
                 success=False,
                 code=0,
@@ -1114,14 +1130,14 @@ def points_settlement(request: PointsSettlementRequest = Body(...)):
                 message='设备ID不能为空'
             )
 
-        shopConfig = get_gb_config(request.Shopid, request.Crid)
+        shopConfig = get_gb_config(Shopid, Crid)
 
         if not shopConfig:
             return BaseResponse(
                 success=False,
                 code=0,
                 data=None,
-                message=f'获取店铺_机器配置为空，请检查店铺配置[{request.Shopid}|{request.Crid}]'
+                message=f'获取店铺_机器配置为空，请检查店铺配置[{Shopid}|{Crid}]'
             )
 
         # 解析参数并调用接口
@@ -1132,7 +1148,7 @@ def points_settlement(request: PointsSettlementRequest = Body(...)):
             "terminalId": shopConfig['storeNo'] + shopConfig['terminalId'],
             "biscode": '801',
             "companyCode": 'GB',
-            "dh": get_gb_settlement_dh(shopConfig['cashierId'], request.SettlementCnt),
+            "dh": get_gb_settlement_dh(shopConfig['cashierId'], SettlementCnt),
         }
         result = gb_post(url, param)
         
@@ -1145,22 +1161,18 @@ def points_settlement(request: PointsSettlementRequest = Body(...)):
                 message=result.get("message", "成功")
             )
         else:
-            raise HTTPException(
-                status_code=400,
-                detail=BaseResponse(
-                    success=False,
-                    code=result["code"],
-                    message=result.get("message", "请求失败")
-                ).dict()
+            return BaseResponse(
+                success=False,
+                code=result["code"],
+                data=None,
+                message=result.get("message", "请求失败")
             )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=BaseResponse(
-                success=False,
-                code=-1,
-                message=f"接口调用异常: {str(e)}"
-            ).dict()
+        return BaseResponse(
+            success=False,
+            code=-1,
+            data=None,
+            message=f"接口调用异常: {str(e)}"
         )
 
 

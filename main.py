@@ -47,8 +47,7 @@ def api_member_lookup(
     try:
         # 广百会员调用 GBAPI.find_member_info_brand
         if memberType == "GBM":
-            req = FindMemberInfoBrandRequest(strCustomer=identifier)
-            resp = find_member_info_brand(req)
+            resp = find_member_info_brand(identifier)
 
             # 支持函数直接返回 Pydantic BaseResponse 或 dict
             data = None
@@ -63,21 +62,28 @@ def api_member_lookup(
                 message = resp.get("message", "")
                 success_flag = 1 if resp.get("code") == 1 else 0
 
+            if success_flag == 0:
+                return {"success": 0, "message": message, "card": "", "mobile": "", "memberId": "", "discount": 0, "points": 0}
             
             # 如果查询到会员信息，尝试调用 GBAPI.points_query 查询积分
             points = 0
+            success_flag = 0
+            message = ""
             try:
                 member_card = data.get("strCard") if isinstance(data, dict) else None
                 if member_card:
-                    pq_req = PointsQueryRequest(Shopid=shopID, Crid=Crid, MemberCard=member_card)
-                    pq_resp = points_query(pq_req)
+                    pq_resp = points_query(shopID, Crid, member_card)
                     if hasattr(pq_resp, "data"):
+                        success_flag= 1 if getattr(pq_resp, "success", False) else 0
+                        message = getattr(pq_resp, "message", "")
                         data_obj = getattr(pq_resp, "data", {})
                         if isinstance(data_obj, dict):
                             pts = data_obj.get("points", 0)
                         else:
                             pts = 0
                     elif isinstance(pq_resp, dict):
+                        success_flag = 1 if pq_resp.get("code") == 1 else 0
+                        message = pq_resp.get("message", "")
                         data_obj = pq_resp.get("data", {})
                         if isinstance(data_obj, dict):
                             pts = data_obj.get("points", 0)
@@ -85,10 +91,16 @@ def api_member_lookup(
                             pts = 0
                     else:
                         pts = 0
+                    
+                    if success_flag == 0:
+                        return {"success": 0, "message": message, "card": "", "mobile": "", "memberId": "", "discount": 0, "points": 0}
+
                     try:
                         points = int(pts) if pts is not None else 0
                     except Exception:
                         points = 0
+                else:
+                    return {"success": 0, "message": "获取广百会员卡号为空", "card": "", "mobile": "", "memberId": "", "discount": 0, "points": 0}
             except Exception:
                 points = -1
 
