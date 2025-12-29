@@ -1,4 +1,5 @@
 # db.py
+from datetime import date
 import pyodbc
 import logging
 import os
@@ -328,7 +329,7 @@ def SaveCartPayment(
         conn = get_connection()
         cursor = conn.cursor()
 
-        sql = "EXEC MPos_Crm01_SaveCartPayment " + ", ".join(["?" for _ in range(11)])
+        sql = "EXEC MPos_Crm01_SaveCartPayment " + ", ".join(["?" for _ in range(12)])
 
         params = (
             TransDate,
@@ -1104,3 +1105,105 @@ def GetCrid(shopID: str, machine: str):
 
     except Exception as e:
         raise e
+
+
+def CreateNewInvoid(transDate: date, shopid: str, crid: str):
+    """
+    生成发票号
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_Crm01_NewInvo ?, ?, ?"
+
+        try:
+            cursor.execute(sql, (shopid, transDate, crid))
+        except Exception as sql_ex:
+            logging.error(f"SQL Execute Error: {sql} | Params: {shopid}, {crid}| Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        row = cursor.fetchone()
+
+        if row:
+            return row[0]
+        return None
+
+    except Exception as e:
+        raise e
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def SubmitPayment(transDate: date, shopid: str, crid: str, cartID: str, invoiceID:int, memberCard: str, memberCardType: str, salesAssociate: str, usePromotion: str, operator: str, marketID: str ):
+    """
+    提交发票
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_Crm01_SubmitInvoice ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?"
+
+        try:
+            cursor.execute(sql, (marketID, operator, transDate, shopid, crid, invoiceID, cartID, memberCard, memberCardType, salesAssociate, usePromotion))
+        except Exception as sql_ex:
+            conn.rollback()
+            logging.error(f"SQL Execute Error: {sql} | Params: {shopid}, {cartID}, {invoiceID}| Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        row = cursor.fetchone()
+
+        if row:
+            conn.commit()
+            return {'ReturnID': row[0], 'ReturnMessage':row[1]}
+        else:
+            conn.rollback()
+            return {'ReturnID': 0, 'ReturnMessage':f'脚本返回解析失败：{row}'}
+
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def SaveProperty(transDate: date, shopid: str, crid: str, invoiceID:int, propKey:str, propValue:str):
+    """
+    生成发票号
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_Crm01_InsertProperty ?, ?, ?, ?, ?, ?"
+
+        try:
+            cursor.execute(sql, (transDate, shopid, crid, invoiceID, propKey, propValue))
+        except Exception as sql_ex:
+            conn.rollback()
+            logging.error(f"SQL Execute Error: {sql} | Params: {shopid}, {crid}| Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        conn.commit()
+
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()

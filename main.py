@@ -1,7 +1,8 @@
+from datetime import date
 from typing import Union
 
 from fastapi import FastAPI, Query
-from db import ListDiscount
+from db import CreateNewInvoid, ListDiscount, SaveProperty, SubmitPayment
 from db import GetSysConfig
 from db import DeleteCartItem
 from db import GetCartItems
@@ -631,6 +632,71 @@ def api_get_crid(
     if crid is None:
         return {"success": True, "count": 0, "data": None}
     return {"success": True, "count": 1, "data": crid}
+
+
+## 获取发票号（调用存储过程 MPos_Crm01_NewInvo）
+@app.get("/creat-new-invoid")
+def api_creat_new_invoid(
+    TransDate: date = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式，例如 2025-12-01"),
+    Shopid: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+):
+    invoid = CreateNewInvoid(TransDate, Shopid, Crid)
+    if invoid is None:
+        return {"success": True, "count": 0, "data": None}
+    return {"success": True, "count": 1, "data": invoid}
+
+
+## 提交发票数据（调用存储过程 MPos_Crm01_SubmitInvoice）
+@app.get("/submit-payment")
+def api_submit_payment(
+    TransDate: date = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式，例如 2025-12-01"),
+    Shopid: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+    CartID: str = Query(..., description="购物车 ID（uniqueidentifier），UUID 字符串"),
+    InvoiceID:int = Query(..., description="发票号"),
+    MemberCard: str = Query(..., description="会员卡号"),
+    MemberCardType: str = Query(..., description="会员卡类型"),
+    SalesAssociate: str = Query(..., description=""),
+    UsePromotion: str = Query(..., description=""),
+    Operator: str = Query(..., description="收银员"),
+    MarketID: str = Query(..., description="市场ID"),
+):
+    result = SubmitPayment(
+        TransDate,
+        Shopid,
+        Crid,
+        CartID,
+        InvoiceID,
+        MemberCard,
+        MemberCardType,
+        SalesAssociate,
+        UsePromotion,
+        Operator,
+        MarketID,
+    )
+    # 解析结果
+    if result['ReturnID']:
+        if result['ReturnID'] == 1:
+            return {"success": True, "result": result["ReturnMessage"]}
+        else:
+            return {"success": False, "result": f'提交失败：{result["ReturnMessage"]}'}
+    else:
+        return {"success": False, "result": f'脚本返回结果无法解析'}
+
+
+## 保存销售订单属性数据（调用存储过程 MPos_Crm01_InsertProperty）
+@app.get("/save-property")
+def api_save_property(
+    TransDate: date = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式，例如 2025-12-01"),
+    Shopid: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+    InvoiceID:int = Query(..., description="发票号"),
+    PropKey: str = Query(..., description="属性Key"),
+    PropValue: str = Query(..., description="属性值"),
+):
+    SaveProperty(TransDate, Shopid, Crid, InvoiceID, PropKey, PropValue)
+    return {"success": True}
 
 
 if __name__ == "__main__":
