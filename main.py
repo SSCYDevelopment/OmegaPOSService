@@ -2,7 +2,7 @@ from datetime import date
 from typing import Union
 
 from fastapi import FastAPI, Query
-from db import CreateNewInvoid, ListDiscount, SaveProperty, SubmitPayment
+from db import CreateNewInvoid, ListDiscount, SaveProperty, SubmitPayment, GetCouponTypes
 from db import GetSysConfig
 from db import DeleteCartItem
 from db import GetCartItems
@@ -31,11 +31,27 @@ from db import GetCrid
 
 import uvicorn
 from GBAPI import gb_router, find_member_info_brand, points_query
-from GBModel import FindMemberInfoBrandRequest, PointsQueryRequest
 
 app = FastAPI()
 app.include_router(gb_router)
 
+
+# 获取可用优惠券类型（调用存储过程 MPos_Crm01_GetDiscountTypes ）
+@app.get("/coupon-types")
+def api_get_coupon_types(
+    lcMakt: str = Query(..., description="市场/货币代码（char(2)），例如系统中使用的市场代码"),
+):
+    data = GetCouponTypes(lcMakt)
+    if data is None:
+        count = 0
+    elif isinstance(data, (list, tuple, set, dict)):
+        count = len(data)
+    else:
+        try:
+            count = len(data)
+        except Exception:
+            count = 1
+    return {"success": True, "count": count, "data": data}
 
 
 @app.get("/member-lookup")

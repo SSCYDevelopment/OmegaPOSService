@@ -1252,3 +1252,33 @@ def SaveSupplyInfo(supplyInfo):
             cursor.close()
         if conn:
             conn.close()
+
+
+def GetCouponTypes(lcMakt: str):
+    """
+    获取优惠券类型
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_Crm01_GetCouponTypes ?"
+
+        try:
+            cursor.execute(sql, (lcMakt))
+        except Exception as sql_ex:
+            logging.error(f"SQL Execute Error: {sql} | Params: {lcMakt} | Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        columns = [col[0] for col in cursor.description] if cursor.description else []
+        rows = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        return [dict(zip(columns, row)) for row in rows]
+
+    except Exception as e:
+        raise e
+
+
