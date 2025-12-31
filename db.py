@@ -1104,3 +1104,61 @@ def GetCrid(shopID: str, machine: str):
 
     except Exception as e:
         raise e
+
+
+def SyncGetSales(ShopID: str, trandate: str, Crid: str, invoiceID: int):
+    """Call stored procedure MPos_Sync_GetSales which returns 4 result sets:
+    1) crsalh (header)
+    2) crsald (details)
+    3) crctdr (payments)
+    4) crprop (props)
+
+    Returns a dict with keys: `header`, `details`, `payments`, `props`.
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_Sync_GetSales ?, ?, ?, ?"
+
+        try:
+            cursor.execute(sql, (ShopID, trandate, Crid, invoiceID))
+        except Exception as sql_ex:
+            logging.error(f"SQL Execute Error: {sql} | Params: {ShopID}, {trandate}, {Crid}, {invoiceID} | Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        result = {}
+        sets = ["header", "details", "payments", "props"]
+        idx = 0
+
+        while True:
+            columns = [col[0] for col in cursor.description] if cursor.description else []
+            rows = cursor.fetchall() if cursor.description else []
+            key = sets[idx] if idx < len(sets) else f"set_{idx}"
+            result[key] = [dict(zip(columns, row)) for row in rows]
+
+            idx += 1
+            if not cursor.nextset():
+                break
+
+        cursor.close()
+        conn.close()
+
+        return result
+
+    except Exception as e:
+        logging.error(f"SyncGetSales error: Params=({ShopID},{trandate},{Crid},{invoiceID}) Error={str(e)}")
+        if cursor:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        raise e
+
