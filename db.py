@@ -1082,6 +1082,8 @@ def GetCrid(shopID: str, machine: str):
     """
     根据店铺ID和设备ID获取机器号
     """
+    conn = None
+    cursor = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -1091,13 +1093,13 @@ def GetCrid(shopID: str, machine: str):
         try:
             cursor.execute(sql, (shopID, machine))
         except Exception as sql_ex:
+            conn.rollback()
             logging.error(f"SQL Execute Error: {sql} | Params: {shopID}, {machine}| Error: {str(sql_ex)}")
             raise Exception("SQL 执行错误，请联系系统管理员")
 
         row = cursor.fetchone()
 
-        cursor.close()
-        conn.close()
+        conn.commit()
 
         if row:
             return row[0]
@@ -1105,6 +1107,11 @@ def GetCrid(shopID: str, machine: str):
 
     except Exception as e:
         raise e
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 def CreateNewInvoid(transDate: date, shopid: str, crid: str):
