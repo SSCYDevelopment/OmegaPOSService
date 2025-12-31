@@ -1,0 +1,608 @@
+# Crm01 接口API
+from datetime import date
+from typing import Union
+
+from fastapi import FastAPI, Query
+from db import CreateNewInvoid, ListDiscount, SaveProperty, SubmitPayment, GetCouponTypes
+from db import GetSysConfig
+from db import DeleteCartItem
+from db import GetCartItems
+from db import SaveCartItem
+from db import SaveCartPayment
+from db import SaveCartMemberCard
+from db import SaveDiscountTicket
+from db import SaveCartInfo
+from db import RemoveDiscountTicket
+from db import GetPaymentType
+from db import GetSuspend
+from db import CleanCart
+from db import CleanCartPayment
+from db import CheckStyl
+from db import InsertInvoiceProperty
+from db import DeleteInvoiceProperty
+from db import SyncSaveStyle
+from db import GetShift
+from db import NewInvo
+from db import GetInvoiceByIden
+from db import SyncSaveSku
+from db import SyncSavePrice
+from db import GetReceiptData
+from db import GetMemberTypies
+from db import GetCrid
+
+import uvicorn
+from GBAPI import gb_router, find_member_info_brand, points_query, query_xfk_info, query_by_tmq
+
+from fastapi import APIRouter, Body, HTTPException, Query
+
+
+# 创建API路由器
+crm01_router = APIRouter(prefix="/crm01", tags=["收银接口"])
+
+
+# 获取优惠券信息
+@crm01_router.get("/coupon-info")
+def api_get_coupon_info(
+    shopID: str = Query(..., description="店铺代码：可选"),
+    crid: str = Query(..., description="收银机号：可选"),
+    couponType: str = Query(..., deprecated="优惠券类型"), 
+    couponNum: str = Query(..., description="优惠券号"),
+):
+    try:
+        if couponType == 'P': #'GBJFK': # 广百积分卡
+            jfkResponse = query_xfk_info(shopID, crid, couponNum)
+            if jfkResponse.success == True:
+                return {
+                    "code": "1", 
+                    "message": "获取数据成功", 
+                    "cardno": jfkResponse.data['rcardno'], 
+                    "facevalue": jfkResponse.data['rmoney'], 
+                    "balance": jfkResponse.data['rye'] , 
+                    "starttime": '', 
+                    "endtime": jfkResponse.data['ryxrq']
+                }
+            else:
+                return {"code": "0", "message": f"{jfkResponse['message']}", "cardno": "", "facevalue": 0, "balance": 0 , "starttime": "", "endtime": ""}
+        elif couponType == 'A': #"GBXJQ":
+            xjqResponse = query_by_tmq(shopID, crid, couponNum)
+            if xjqResponse.success == True:
+                return {
+                    "code": "1", 
+                    "message": "获取数据成功", 
+                    "cardno": xjqResponse.data['rcardno'], 
+                    "facevalue": xjqResponse.data['rmoney'], 
+                    "balance": xjqResponse.data['rye'] , 
+                    "starttime": '', 
+                    "endtime": xjqResponse.data['ryxrq']
+                }
+            else:
+                return {"code": "0", "message": f"{xjqResponse['message']}", "cardno": "", "facevalue": 0, "balance": 0 , "starttime": "", "endtime": ""}
+        else:
+            return {"code": "0", "message": f"没有找到相应的卡类型{couponType}", "cardno": "", "facevalue": 0, "balance": 0 , "starttime": "", "endtime": ""}
+    except Exception as e:
+        return {"success": -1, "message": f"异常: {e}", "cardno": "", "facevalue": 0, "balance": 0 , "starttime": "", "endtime": ""}
+
+
+
+# 获取可用优惠券类型（调用存储过程 MPos_Crm01_GetDiscountTypes ）
+@crm01_router.get("/coupon-types")
+def api_get_coupon_types(
+    lcMakt: str = Query(..., description="市场/货币代码（char(2)），例如系统中使用的市场代码"),
+):
+    data = GetCouponTypes(lcMakt)
+    if data is None:
+        count = 0
+    elif isinstance(data, (list, tuple, set, dict)):
+        count = len(data)
+    else:
+        try:
+            count = len(data)
+        except Exception:
+            count = 1
+    return {"success": True, "count": count, "data": data}
+
+
+@crm01_router.get("/member-lookup")
+def api_member_lookup(
+    memberType: str = Query(..., description="会员类型: 广百会员,SANSE会员,其他会员"),
+    identifier: str = Query(..., description="会员识别号: 会员卡号/会员码/手机号"),
+    shopID: str = Query('', description="店铺代码：可选"),
+    Crid: str = Query('', description="收银机号：可选"),
+):
+    try:
+        # 广百会员调用 GBAPI.find_member_info_brand
+        if memberType == "GBM":
+            resp = find_member_info_brand(identifier)
+
+            # 支持函数直接返回 Pydantic BaseResponse 或 dict
+            data = None
+            message = ""
+            success_flag = 0
+            if hasattr(resp, "data"):
+                data = getattr(resp, "data")
+                message = getattr(resp, "message", "")
+                success_flag = 1 if getattr(resp, "success", False) else 0
+            elif isinstance(resp, dict):
+                data = resp.get("data")
+                message = resp.get("message", "")
+                success_flag = 1 if resp.get("code") == 1 else 0
+
+            if success_flag == 0:
+                return {"success": 0, "message": message, "card": "", "mobile": "", "memberId": "", "discount": 0, "points": 0}
+            
+            # 如果查询到会员信息，尝试调用 GBAPI.points_query 查询积分
+            points = 0
+            success_flag = 0
+            message = ""
+            try:
+                member_card = data.get("strCard") if isinstance(data, dict) else None
+                if member_card:
+                    pq_resp = points_query(shopID, Crid, member_card)
+                    if hasattr(pq_resp, "data"):
+                        success_flag= 1 if getattr(pq_resp, "success", False) else 0
+                        message = getattr(pq_resp, "message", "")
+                        data_obj = getattr(pq_resp, "data", {})
+                        if isinstance(data_obj, dict):
+                            pts = data_obj.get("points", 0)
+                        else:
+                            pts = 0
+                    elif isinstance(pq_resp, dict):
+                        success_flag = 1 if pq_resp.get("code") == 1 else 0
+                        message = pq_resp.get("message", "")
+                        data_obj = pq_resp.get("data", {})
+                        if isinstance(data_obj, dict):
+                            pts = data_obj.get("points", 0)
+                        else:
+                            pts = 0
+                    else:
+                        pts = 0
+                    
+                    if success_flag == 0:
+                        return {"success": 0, "message": message, "card": "", "mobile": "", "memberId": "", "discount": 0, "points": 0}
+
+                    try:
+                        points = int(pts) if pts is not None else 0
+                    except Exception:
+                        points = 0
+                else:
+                    return {"success": 0, "message": "获取广百会员卡号为空", "card": "", "mobile": "", "memberId": "", "discount": 0, "points": 0}
+            except Exception:
+                points = -1
+
+            if data:
+                return {
+                    "success": 1,
+                    "message": message or "成功",
+                    "card": data.get("strCard") if isinstance(data, dict) else None,
+                    "mobile": data.get("strMobile") if isinstance(data, dict) else None,
+                    "memberId": data.get("strNo") if isinstance(data, dict) else None,
+                    "discount": 5,
+                    "points": points,
+                }
+            else:
+                return {"success": 0, "message": "未找到会员信息", "card": "", "mobile": "", "memberId": "", "discount": 0, "points": 0}
+
+        # SANSE会员/其他会员 - placeholder 实现
+        elif memberType == "SANSEclub":
+            return {"success": 0, "message": "SANSE会员识别尚未实现", "card": "", "mobile": "", "memberId": "", "discount": 0, "points": 0}
+        else:
+            return {"success": 0, "message": "其他会员类型未实现", "card": "", "mobile": "", "memberId": "", "discount": 0, "points": 0}
+
+    except Exception as e:
+        return {"success": -1, "message": f"异常: {e}", "card": "", "mobile": "", "memberId": "", "discount": 0, "points": 0}
+    
+@crm01_router.get("/member-types")
+def api_get_member_types(shopID: str = Query('', description="店铺代码（char(5），可选")):
+    try:
+        data = GetMemberTypies(shopID)
+        count = len(data) if isinstance(data, (list, tuple)) else 0
+        return {"success": True, "count": count, "data": data}
+    except Exception as e:
+        return {"success": False, "message": str(e), "data": None}    
+
+
+
+##删除购物车项目
+@crm01_router.get("/delete-cart-item")
+def api_delete_cart_item(TransDate: str, Shop: str, Crid: str, CartID: str, Seqn: int):
+
+    result = DeleteCartItem(TransDate, Shop, Crid, CartID, Seqn)
+    return {"success": True, "result": result}
+
+
+## 清空/重置购物车（调用存储过程 MPos_Crm01_cleancart）
+@crm01_router.get("/clean-cart")
+def api_clean_cart(TransDate: str, Shop: str, Crid: str, CartID: str):
+    result = CleanCart(TransDate, Shop, Crid, CartID)
+    return {"success": True, "result": result}
+
+
+## 清空/重置购物车支付信息（调用存储过程 MPos_Crm01_cleancartpayment）
+@crm01_router.get("/clean-cart-payment")
+def api_clean_cart_payment(TransDate: str, Shop: str, Crid: str, CartID: str):
+    result = CleanCartPayment(TransDate, Shop, Crid, CartID)
+    return {"success": True, "result": result}
+
+
+## Invoice 属性：添加（调用 MPos_Crm01_InsertProperty）
+@crm01_router.get("/invoice-property-add")
+def api_insert_invoice_property(
+    pdTxdt: str = Query(..., description="交易日期（smalldatetime），建议 ISO 格式"),
+    pdShop: str = Query(..., description="店铺代码（char(5)）"),
+    pcCrid: str = Query(..., description="收银机号（char(3)）"),
+    pnInvo: int = Query(..., description="发票/交易编号（int）"),
+    pcProp: str = Query(..., description="属性名（varchar(10)）"),
+    pcValue: str = Query('', description="属性值（nvarchar，optional）"),
+):
+    result = InsertInvoiceProperty(pdTxdt, pdShop, pcCrid, pnInvo, pcProp, pcValue)
+    return {"success": True, "result": result}
+
+
+## Invoice 属性：查询/删除（调用 MPos_Crm01_DeleteProperty）
+@crm01_router.get("/invoice-property-remove")
+def api_delete_invoice_property(
+    pdTxdt: str = Query(..., description="交易日期（smalldatetime），建议 ISO 格式"),
+    pdShop: str = Query(..., description="店铺代码（char(5)）"),
+    pcCrid: str = Query(..., description="收银机号（char(3)）"),
+    pnInvo: int = Query(..., description="发票/交易编号（int）"),
+    pcProp: str = Query(..., description="属性名（varchar(10)），支持前缀匹配"),
+):
+    data = DeleteInvoiceProperty(pdTxdt, pdShop, pcCrid, pnInvo, pcProp)
+    if data is None:
+        count = 0
+    elif isinstance(data, (list, tuple, set, dict)):
+        count = len(data)
+    else:
+        try:
+            count = len(data)
+        except Exception:
+            count = 1
+    return {"success": True, "count": count, "data": data}
+
+
+##获取购物车项目
+@crm01_router.get("/cart-items")
+def api_get_cart_items(TransDate: str, Shop: str, Crid: str, CartID: str):
+    data = GetCartItems(TransDate, Shop, Crid, CartID)
+    if data is None:
+        count = 0
+    elif isinstance(data, (list, tuple, set, dict)):
+        count = len(data)
+    else:
+        try:
+            count = len(data)
+        except Exception:
+            count = 1
+    return {"success": True, "count": count, "data": data}
+
+
+##保存/更新购物车项目（调用存储过程）
+@crm01_router.get("/save-cart-item")
+def api_save_cart_item(
+    TransDate: str = Query(..., description="交易日期（smalldatetime），建议 ISO 格式，例如 2025-12-01 或 2025-12-01 14:30:00"),
+    Shop: str = Query(..., description="店铺代码（char(5)），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+    CartID: str = Query(..., description="购物车 ID（uniqueidentifier），UUID 字符串，例如 11111111-1111-1111-1111-111111111111"),
+    Seqn: int = Query(..., description="购物车商品序号（int），传 -1 表示让存储过程自动分配新的序号"),
+    ItemType: str = Query(..., description="销售类型（char(1)），表示卖/退 等代码"),
+    skuBarcode: str = Query(..., description="条码（char(21)），商品条码/扫描码"),
+    StyleCode: str = Query(..., description="货号/款号（char(15)），用于标识款式/货号"),
+    Color: str = Query(..., description="颜色码（char(3)），颜色标识码"),
+    Size: str = Query(..., description="尺码（char(3)），例如 M/L 或数字码"),
+    qty: int = Query(..., description="数量（int），当前行项的商品数量"),
+    Weight: float = Query(..., description="重量（money），前端传 float 即可，单位按系统约定"),
+    Price: float = Query(..., description="单价（money）"),
+    UnitPrice: float = Query(..., description="原价（money），销售前的原始单价"),
+    Amnt: float = Query(..., description="金额（money），行项目实际金额（含折扣后的金额）"),
+    UnitPriceAmnt: float = Query(..., description="原价金额合计（money），按原价计算的金额合计"),
+    Discount: float = Query(..., description="折扣（money），折扣金额或折扣值，按系统约定"),
+    DiscountType: str = Query(..., description="折扣类型（char(1)），表示折扣方式/类别的代码"),
+    DiscountID: str = Query(..., description="折扣代码（varchar(20)），对应的折扣标识"),
+    DiscountBrandBit: int = Query(..., description="折扣可用品牌（int），通常为品牌位掩码/标识"),
+    DiscountPtyp: str = Query(..., description="折扣可用付款方式（char(1)），表示折扣可用于的付款类型代码"),
+    PromotionCode: str = Query("", description="促销编码（varchar(12)，可选，默认空字符串"),
+    PromotionID: str = Query("", description="促销标识/ID（varchar(20)，可选，默认空字符串"),
+    Message: str = Query("", description="备注/信息（nvarchar(100)，可选）"),
+    Change: str = Query("", description="变更标志（char(1)，可选），用于标识行项变更类型"),
+    SaleType: str = Query("", description="销售子类型（char(1)，可选）"),
+    Line: str = Query("", description="系列/线路代码（char(3)，可选）"),
+    Brand: str = Query("", description="品牌代码（char(3)，可选）"),
+    Category: str = Query("", description="类别代码（char(2)，可选）"),
+    Ptype: str = Query("", description="销售类型（char(1)），表示卖/退 等代码，可选"),        
+    Calced: str = Query("", description="是否已计算标志（char(1)，可选），表示是否已完成某类计算"),
+    Commision: float = Query(0, description="佣金（money），行项目的佣金金额，默认 0"),
+    GPrice: float = Query(0, description="GPrice（money），内部价格字段，默认 0"),
+    LostSales: str = Query("", description="缺货销售标记（char(1)，可选）"),
+    CumulateValue: str = Query("", description="是否计入累计值（char(1)，可选），例如是否计入积分/累计金额"),
+    VoucherID: str = Query("", description="券/代金券 ID（varchar(100)，可选）"),
+    BrandBit: int = Query(-1, description="品牌位（int），-1 常表示“不限制”或未设置，默认 -1"),
+    SupplierID: str = Query("", description="供应商 ID（varchar(8)，可选）"),
+    PantsLength: int = Query(0, description="裤长（int，可选），适用于裤装类的额外长度信息，默认 0"),
+    isEShop: str = Query("", description="是否来自电商（char(1)，可选），如 'Y'/'N' 表示电商来源标记"),
+):
+    result = SaveCartItem(
+        TransDate,
+        Shop,
+        Crid,
+        CartID,
+        Seqn,
+        ItemType,
+        skuBarcode,
+        StyleCode,
+        Color,
+        Size,
+        qty,
+        Weight,
+        Price,
+        UnitPrice,
+        Amnt,
+        UnitPriceAmnt,
+        Discount,
+        DiscountType,
+        DiscountID,
+        DiscountBrandBit,
+        DiscountPtyp,
+        PromotionCode,
+        PromotionID,
+        Message,
+        Change,
+        SaleType,
+        Line,
+        Brand,
+        Category,
+        Ptype,
+        Calced,
+        Commision,
+        GPrice,
+        LostSales,
+        CumulateValue,
+        VoucherID,
+        BrandBit,
+        SupplierID,
+        PantsLength,
+        isEShop,
+    )
+
+    return {"success": True, "result": result}
+
+
+## 保存/更新购物车头信息（调用存储过程 MPos_Crm01_SaveCartInfo）
+@crm01_router.get("/save-cart-info")
+def api_save_cart_info(
+    TransDate: str = Query(..., description="销售日期（smalldatetime），建议使用 ISO 格式，例如 2025-12-01"),
+    Shop: str = Query(..., description="销售门店（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号码（char(3)），3 字符收银机/柜台编号"),
+    CartID: str = Query(..., description="购物车 ID（uniqueidentifier），UUID 字符串"),
+    memberCard: str = Query(..., description="会员卡号（char(10)），10 字符会员卡编号"),
+    SalesAssociate: str = Query(..., description="销售/导购名称或 ID（varchar(40)）"),
+    isEshop: str = Query('', description="是否来自电商（char(1)，可选，默认空字符串，例如 'Y'/'N'"),
+    CityID: int = Query(0, description="城市 ID（int，可选，默认 0"),
+    DistID: int = Query(0, description="区/县 ID（int，可选，默认 0"),
+    Mobile: str = Query('', description="手机号（varchar(20)，可选）"),
+    ReceiverName: str = Query('', description="收货人姓名（nvarchar(10)，可选）"),
+    Address: str = Query('', description="收货地址（nvarchar(200)，可选）"),
+    Remark: str = Query('', description="备注（nvarchar(200)，可选）"),
+):
+    result = SaveCartInfo(
+        TransDate,
+        Shop,
+        Crid,
+        CartID,
+        memberCard,
+        SalesAssociate,
+        isEshop,
+        CityID,
+        DistID,
+        Mobile,
+        ReceiverName,
+        Address,
+        Remark,
+    )
+
+    return {"success": True, "result": result}
+
+
+## 保存/更新支付信息（调用存储过程 MPos_Crm01_SavePayment）
+@crm01_router.get("/save-payment")
+def api_save_payment(
+    TransDate: str = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式，例如 2025-12-01"),
+    Shop: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+    CartID: str = Query(..., description="购物车 ID（uniqueidentifier），UUID 字符串"),
+    paymentType: str = Query(..., description="支付方式（char(1)），例如 1=现金、2=卡、3=支付宝 等（按系统约定）"),
+    Code: str = Query(..., description="支付序列号/卡号/账号（char(20)），支付凭证或卡号等"),
+    currency: str = Query(..., description="货币代码（char(3)），例如 CNY、USD"),
+    localAmount: float = Query(..., description="本币金额（money）"),
+    originalAmount: float = Query(..., description="原币金额（money），如跨币种支付时使用"),
+    exchangeRate: float = Query(..., description="汇率（MONEY），用于计算本币/原币换算"),
+    type_: int = Query(0, description="类型（int，可选，默认 0，用作备用字段）"),
+    ptype: str = Query('', description="类型2（char(1)，可选，备用字段）"),
+):
+    result = SaveCartPayment(
+        TransDate,
+        Shop,
+        Crid,
+        CartID,
+        paymentType,
+        Code,
+        currency,
+        localAmount,
+        originalAmount,
+        exchangeRate,
+        type_,
+        ptype,
+    )
+
+    return {"success": True, "result": result}
+
+
+## 保存/更新购物车会员卡（调用存储过程 MPos_crm01_SaveCartMemberCard）
+@crm01_router.get("/save-cart-membercard")
+def api_save_cart_membercard(
+    TransDate: str = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式"),
+    Shop: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+    CartID: str = Query(..., description="购物车 ID（uniqueidentifier），UUID 字符串"),
+    memberCard: str = Query(..., description="会员卡号（char(10)）"),
+):
+    result = SaveCartMemberCard(TransDate, Shop, Crid, CartID, memberCard)
+    return {"success": True, "result": result}
+
+
+## 保存/更新折扣券（调用存储过程 MPos_Crm01_SaveDiscountTicket）
+@crm01_router.get("/save-discount-ticket")
+def api_save_discount_ticket(
+    TransDate: str = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式"),
+    Shop: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+    CartID: str = Query(..., description="购物车 ID（uniqueidentifier），UUID 字符串"),
+    DiscountTicketID: str = Query(..., description="折扣券 ID（varchar(25)）"),
+    DiscountAmount: float = Query(..., description="折扣金额（money）"),
+):
+    result = SaveDiscountTicket(TransDate, Shop, Crid, CartID, DiscountTicketID, DiscountAmount)
+    return {"success": True, "result": result}
+
+
+## 删除折扣券（调用存储过程 MPos_Crm01_RemoveDiscountTicket）
+@crm01_router.get("/remove-discount-ticket")
+def api_remove_discount_ticket(
+    TransDate: str = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式"),
+    Shop: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+    CartID: str = Query(..., description="购物车 ID（uniqueidentifier），UUID 字符串"),
+    DiscountTicketID: str = Query(..., description="折扣券 ID（varchar(25)）"),
+):
+    affected = RemoveDiscountTicket(TransDate, Shop, Crid, CartID, DiscountTicketID)
+    return {"success": True, "affected": affected}
+
+
+## 获取可用支付方式（调用存储过程 MPos_Crm01_GetPaymentType）
+@crm01_router.get("/payment-types")
+def api_get_payment_types(
+    lcMakt: str = Query(..., description="市场/货币代码（char(2)），例如系统中使用的市场代码"),
+    lcMemberDate: str = Query('N', description="是否仅显示会员近期方式（char(1)，'Y' 或 'N'，默认 'N'）"),
+):
+    data = GetPaymentType(lcMakt, lcMemberDate)
+    if data is None:
+        count = 0
+    elif isinstance(data, (list, tuple, set, dict)):
+        count = len(data)
+    else:
+        try:
+            count = len(data)
+        except Exception:
+            count = 1
+    return {"success": True, "count": count, "data": data}
+
+
+
+## 获取挂起购物车列表（调用存储过程 MPos_crm01_GetSuspend）
+@crm01_router.get("/suspend-list")
+def api_get_suspend_list(
+    TransDate: str = Query(..., description="交易日期（smalldatetime），建议 ISO 格式，例如 2025-12-01"),
+    Shop: str = Query(..., description="店铺代码（char(5)，5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)，3 字符收银机/柜台编号"),
+):
+    data = GetSuspend(TransDate, Shop, Crid)
+    if data is None:
+        count = 0
+    elif isinstance(data, (list, tuple, set, dict)):
+        count = len(data)
+    else:
+        try:
+            count = len(data)
+        except Exception:
+            count = 1
+    return {"success": True, "count": count, "data": data}
+
+
+## 获取班次号（调用存储过程 MPos_Crm01_GetShift）
+@crm01_router.get("/get-shift")
+def api_get_shift(
+    pcShop: str = Query(..., description="店铺代码（char(5)）"),
+    pdTxdt: str = Query(..., description="交易日期（smalldatetime），建议 ISO 格式"),
+    pcCrid: str = Query(..., description="收银机号（char(3)）"),
+):
+    shift = GetShift(pcShop, pdTxdt, pcCrid)
+    if shift is None:
+        return {"success": True, "count": 0, "data": None}
+    return {"success": True, "count": 1, "data": shift}
+
+
+## 创建新的空白销售发票（调用存储过程 MPos_Crm01_NewInvo）
+@crm01_router.get("/new-invoice")
+def api_new_invoice(
+    pcShop: str = Query(..., description="店铺代码（char(5)）"),
+    pdTxdt: str = Query(..., description="交易日期（smalldatetime），建议 ISO 格式"),
+    pcCrid: str = Query(..., description="收银机号（char(3)）"),
+):
+    inv = NewInvo(pcShop, pdTxdt, pcCrid)
+    if inv is None:
+        return {"success": True, "count": 0, "data": None}
+    return {"success": True, "count": 1, "data": inv}
+
+
+
+## 获取发票号（调用存储过程 MPos_Crm01_NewInvo）
+@crm01_router.get("/creat-new-invoid")
+def api_creat_new_invoid(
+    TransDate: date = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式，例如 2025-12-01"),
+    Shopid: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+):
+    invoid = CreateNewInvoid(TransDate, Shopid, Crid)
+    if invoid is None:
+        return {"success": True, "count": 0, "data": None}
+    return {"success": True, "count": 1, "data": invoid}
+
+
+## 提交发票数据（调用存储过程 MPos_Crm01_SubmitInvoice）
+@crm01_router.get("/submit-payment")
+def api_submit_payment(
+    TransDate: date = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式，例如 2025-12-01"),
+    Shopid: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+    CartID: str = Query(..., description="购物车 ID（uniqueidentifier），UUID 字符串"),
+    InvoiceID:int = Query(..., description="发票号"),
+    MemberCard: str = Query(..., description="会员卡号"),
+    MemberCardType: str = Query(..., description="会员卡类型"),
+    SalesAssociate: str = Query(..., description=""),
+    UsePromotion: str = Query(..., description=""),
+    Operator: str = Query(..., description="收银员"),
+    MarketID: str = Query(..., description="市场ID"),
+):
+    result = SubmitPayment(
+        TransDate,
+        Shopid,
+        Crid,
+        CartID,
+        InvoiceID,
+        MemberCard,
+        MemberCardType,
+        SalesAssociate,
+        UsePromotion,
+        Operator,
+        MarketID,
+    )
+    # 解析结果
+    if result['ReturnID']:
+        if result['ReturnID'] == 1:
+            return {"success": True, "result": result["ReturnMessage"]}
+        else:
+            return {"success": False, "result": f'提交失败：{result["ReturnMessage"]}'}
+    else:
+        return {"success": False, "result": f'脚本返回结果无法解析'}
+
+
+## 保存销售订单属性数据（调用存储过程 MPos_Crm01_InsertProperty）
+@crm01_router.get("/save-property")
+def api_save_property(
+    TransDate: date = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式，例如 2025-12-01"),
+    Shopid: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+    InvoiceID:int = Query(..., description="发票号"),
+    PropKey: str = Query(..., description="属性Key"),
+    PropValue: str = Query(..., description="属性值"),
+):
+    SaveProperty(TransDate, Shopid, Crid, InvoiceID, PropKey, PropValue)
+    return {"success": True}
