@@ -611,9 +611,10 @@ CREATE TABLE [dbo].[crpomh]
     [phcanx] CHAR NOT NULL, 
     [phvlmt] CHAR NOT NULL DEFAULT '',
     [phdesc] NVARCHAR(100) NOT NULL DEFAULT '',
+    [phmdat] smalldatetime, --modify date
+    [phuser] CHAR(40) NOT NULL DEFAULT '',
     PRIMARY KEY ([phshop], [phtxnt])
 )
-
 
 CREATE TABLE [dbo].[crpomd]
 (
