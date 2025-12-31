@@ -161,33 +161,60 @@ def find_member_info_brand(
         )
 
 
-@gb_router.post("/query-xfk-info", summary="积分卡查询接口", response_model=BaseResponse)
-def query_xfk_info(request: QueryXfkInfoRequest = Body(...)):
+@gb_router.get("/query-xfk-info", summary="积分卡查询接口", response_model=BaseResponse)
+def query_xfk_info(
+    shopID: str = Query(..., description="门店编号"),
+    crid: str = Query(..., description="机器号"),
+    CouponNum: str = Query(..., description="优惠券号"),
+):
     """
     积分卡查询接口
-    接口说明：识别积分卡，查询积分卡余额、卡号。广百、友谊积分卡无法通过数据区分，收款前端需分开广百、友谊两个入口，并传输相应的 vcardbrand 参数。
+    接口说明：识别积分卡，查询积分卡余额、卡号。
 
-    Args:
-        storeNo: 门店编号
-        orderNo：销售小票号
-        cashierId：收款员号
-        terminalId：授权终端号，4位门店号+5位收款终端号
-        vtrack2：磁道信息，刷卡获取的内容
-        vcardbrand：卡类型，201广百积分卡，202友谊积分卡
+    Args:\n
+        shopid: 门店编号\n
+        crid: 机器号\n
+        CouponNum: 优惠券号\n
 
     Returns:
         字典格式的响应数据或错误信息
     """
     try:
+        if not shopID:
+            return BaseResponse(
+                success=False,
+                code=0,
+                data=None,
+                message='店铺ID不能为空'
+            )
+
+        if not crid:
+            return BaseResponse(
+                success=False,
+                code=0,
+                data=None,
+                message='设备ID不能为空'
+            )
+
+        shopConfig = get_gb_config(shopID, crid)
+
+        if not shopConfig:
+            return BaseResponse(
+                success=False,
+                code=0,
+                data=None,
+                message=f'获取店铺_机器配置为空，请检查店铺配置[{shopID}|{crid}]'
+            )
+
         # 解析参数并调用接口
         url = BASE_URL + "/openapi/payment-api/ipayment/pay/v2/queryXfkInfo"
         param = {
-            "storeNo": request.storeNo,
-            "orderNo": request.orderNo,
-            "cashierId": request.cashierId,
-            "terminalId": request.terminalId,
-            "vtrack2": request.vtrack2,
-            "vcardbrand": request.vcardbrand,
+            "storeNo": shopConfig['storeNo'],
+            "orderNo": '1',
+            "cashierId": shopConfig['cashierId'],
+            "terminalId": shopConfig['storeNo'] + shopConfig['terminalId'],
+            "vtrack2": CouponNum,
+            "vcardbrand": '201',
         }
         result = gb_post(url, param)
         
@@ -200,22 +227,18 @@ def query_xfk_info(request: QueryXfkInfoRequest = Body(...)):
                 message=result.get("message", "成功")
             )
         else:
-            raise HTTPException(
-                status_code=400,
-                detail=BaseResponse(
-                    success=False,
-                    code=result["code"],
-                    message=result.get("message", "请求失败")
-                ).dict()
+            return BaseResponse(
+                success=False,
+                code=0,
+                data=None,
+                message=result.get("message", "请求失败")
             )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=BaseResponse(
-                success=False,
-                code=-1,
-                message=f"接口调用异常: {str(e)}"
-            ).dict()
+        return BaseResponse(
+            success=False,
+            code=-1,
+            data=None,
+            message=f"接口调用异常: {str(e)}"
         )
 
 
@@ -467,33 +490,60 @@ def xfk_settlement(request: XfkSettlementRequest = Body(...)):
         )
 
 
-@gb_router.post("/query-by-tmq", summary="条码现金券查询接口", response_model=BaseResponse)
-def query_by_tmq(request: QueryByTmqRequest = Body(...)):
+@gb_router.get("/query-by-tmq", summary="条码现金券查询接口", response_model=BaseResponse)
+def query_by_tmq(
+    shopID: str = Query(..., description="门店编号"),
+    crid: str = Query(..., description="机器号"),
+    CouponNum: str = Query(..., description="优惠券号"),
+):
     """
     条码现金券查询接口
     接口说明：识别条码现金券，查询条码现金券余额。仅支持广百条码现金券。
 
-    Args:
-        storeNo: 门店编号
-        orderNo：销售小票号
-        cashierId：收款员号
-        terminalId：授权终端号，4位门店号+5位收款终端号
-        vtrack2：磁道信息，刷卡获取的内容
-        vcardbrand：卡类型，201广百积分卡，202友谊积分卡
+    Args:\n
+        shopid: 门店编号\n
+        crid: 机器号\n
+        CouponNum: 优惠券号\n
 
     Returns:
         字典格式的响应数据或错误信息
     """
     try:
+        if not shopID:
+            return BaseResponse(
+                success=False,
+                code=0,
+                data=None,
+                message='店铺ID不能为空'
+            )
+
+        if not crid:
+            return BaseResponse(
+                success=False,
+                code=0,
+                data=None,
+                message='设备ID不能为空'
+            )
+
+        shopConfig = get_gb_config(shopID, crid)
+
+        if not shopConfig:
+            return BaseResponse(
+                success=False,
+                code=0,
+                data=None,
+                message=f'获取店铺_机器配置为空，请检查店铺配置[{shopID}|{crid}]'
+            )
+
         # 解析参数并调用接口
         url = BASE_URL + "/openapi/payment-api/ipayment/pay/v2/queryByTmq"
         param = {
-            "storeNo": request.storeNo,
-            "orderNo": request.orderNo,
-            "cashierId": request.cashierId,
-            "terminalId": request.terminalId,
-            "vtrack2": request.vtrack2,
-            "vcardbrand": request.vcardbrand,
+            "storeNo": shopConfig['storeNo'],
+            "orderNo": '1',
+            "cashierId": shopConfig['cashierId'],
+            "terminalId": shopConfig['storeNo'] + shopConfig['terminalId'],
+            "vtrack2": CouponNum,
+            "vcardbrand": '201',
         }
         result = gb_post(url, param)
         
@@ -506,22 +556,18 @@ def query_by_tmq(request: QueryByTmqRequest = Body(...)):
                 message=result.get("message", "成功")
             )
         else:
-            raise HTTPException(
-                status_code=400,
-                detail=BaseResponse(
-                    success=False,
-                    code=result["code"],
-                    message=result.get("message", "请求失败")
-                ).dict()
+            return BaseResponse(
+                success=False,
+                code=0,
+                data=None,
+                message=result.get("message", "请求失败")
             )
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=BaseResponse(
-                success=False,
-                code=-1,
-                message=f"接口调用异常: {str(e)}"
-            ).dict()
+        return BaseResponse(
+            success=False,
+            code=-1,
+            data=None,
+            message=f"接口调用异常: {str(e)}"
         )
 
 

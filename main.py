@@ -30,10 +30,53 @@ from db import GetMemberTypies
 from db import GetCrid
 
 import uvicorn
-from GBAPI import gb_router, find_member_info_brand, points_query
+from GBAPI import gb_router, find_member_info_brand, points_query, query_xfk_info, query_by_tmq
 
 app = FastAPI()
 app.include_router(gb_router)
+
+
+# 获取优惠券信息
+@app.get("/coupon-info")
+def api_get_coupon_info(
+    shopID: str = Query(..., description="店铺代码：可选"),
+    crid: str = Query(..., description="收银机号：可选"),
+    couponType: str = Query(..., deprecated="优惠券类型"), 
+    couponNum: str = Query(..., description="优惠券号"),
+):
+    try:
+        if couponType == 'P': #'GBJFK': # 广百积分卡
+            jfkResponse = query_xfk_info(shopID, crid, couponNum)
+            if jfkResponse.success == True:
+                return {
+                    "code": "1", 
+                    "message": "获取数据成功", 
+                    "cardno": jfkResponse.data['rcardno'], 
+                    "facevalue": jfkResponse.data['rmoney'], 
+                    "balance": jfkResponse.data['rye'] , 
+                    "starttime": '', 
+                    "endtime": jfkResponse.data['ryxrq']
+                }
+            else:
+                return {"code": "0", "message": f"{jfkResponse['message']}", "cardno": "", "facevalue": 0, "balance": 0 , "starttime": "", "endtime": ""}
+        elif couponType == 'A': #"GBXJQ":
+            xjqResponse = query_by_tmq(shopID, crid, couponNum)
+            if xjqResponse.success == True:
+                return {
+                    "code": "1", 
+                    "message": "获取数据成功", 
+                    "cardno": xjqResponse.data['rcardno'], 
+                    "facevalue": xjqResponse.data['rmoney'], 
+                    "balance": xjqResponse.data['rye'] , 
+                    "starttime": '', 
+                    "endtime": xjqResponse.data['ryxrq']
+                }
+            else:
+                return {"code": "0", "message": f"{xjqResponse['message']}", "cardno": "", "facevalue": 0, "balance": 0 , "starttime": "", "endtime": ""}
+        else:
+            return {"code": "0", "message": f"没有找到相应的卡类型{couponType}", "cardno": "", "facevalue": 0, "balance": 0 , "starttime": "", "endtime": ""}
+    except Exception as e:
+        return {"success": -1, "message": f"异常: {e}", "cardno": "", "facevalue": 0, "balance": 0 , "starttime": "", "endtime": ""}
 
 
 # 获取可用优惠券类型（调用存储过程 MPos_Crm01_GetDiscountTypes ）
