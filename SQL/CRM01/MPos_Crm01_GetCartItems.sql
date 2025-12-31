@@ -3,22 +3,16 @@
 go
 
 CREATE PROC MPos_Crm01_GetCartItems
-  @TransDate smalldatetime,
-  @Shop      char(5),
-  @Crid      char(3),
-  @CartID    uniqueidentifier,
-  @usePromotion char(1) = 'N'
+   @TransDate    smalldatetime,
+   @Shop         char(5),
+   @Crid         char(3),
+   @CartID       uniqueidentifier,
+   @usePromotion char(1) = 'N'
 AS
+   SET NOCOUNT ON
 
---查看promotion计算结果
-exec MPOS_Crm01_CalcCompaign 
-    @transactionDate = @TransDate,
-    @shopID = @Shop,
-    @Crid = @Crid,
-    @CartID = @CartID,
-    @memberCard='',
-    @debug='N'
-
+   --查看promotion计算结果
+   EXEC MPOS_Crm01_CalcCompaign @transactionDate = @TransDate,@shopID = @Shop,@Crid = @Crid,@CartID = @CartID,@memberCard='',@debug='N'
 --     SELECT TransDate,
 --            Shop,
 --            Crid,
@@ -69,6 +63,4 @@ exec MPOS_Crm01_CalcCompaign
 --            [CartID] = @CartID AND
 --            a.StyleCode = b.smcode
 --     ORDER  BY seqn
-
-go 
-
+ 

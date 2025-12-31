@@ -1,7 +1,8 @@
+from datetime import date
 from typing import Union
 
 from fastapi import FastAPI, Query
-from db import ListDiscount
+from db import CreateNewInvoid, ListDiscount, SaveProperty, SubmitPayment, GetCouponTypes
 from db import GetSysConfig
 from db import DeleteCartItem
 from db import GetCartItems
@@ -27,12 +28,71 @@ from db import SyncSavePrice
 from db import GetReceiptData
 from db import GetMemberTypies
 import uvicorn
-from GBAPI import gb_router, find_member_info_brand, points_query
-from GBModel import FindMemberInfoBrandRequest, PointsQueryRequest
+from GBAPI import gb_router, find_member_info_brand, points_query, query_xfk_info, query_by_tmq
 
 app = FastAPI()
 app.include_router(gb_router)
 
+
+# 获取优惠券信息
+@app.get("/coupon-info")
+def api_get_coupon_info(
+    shopID: str = Query(..., description="店铺代码：可选"),
+    crid: str = Query(..., description="收银机号：可选"),
+    couponType: str = Query(..., deprecated="优惠券类型"), 
+    couponNum: str = Query(..., description="优惠券号"),
+):
+    try:
+        if couponType == 'P': #'GBJFK': # 广百积分卡
+            jfkResponse = query_xfk_info(shopID, crid, couponNum)
+            if jfkResponse.success == True:
+                return {
+                    "code": "1", 
+                    "message": "获取数据成功", 
+                    "cardno": jfkResponse.data['rcardno'], 
+                    "facevalue": jfkResponse.data['rmoney'], 
+                    "balance": jfkResponse.data['rye'] , 
+                    "starttime": '', 
+                    "endtime": jfkResponse.data['ryxrq']
+                }
+            else:
+                return {"code": "0", "message": f"{jfkResponse['message']}", "cardno": "", "facevalue": 0, "balance": 0 , "starttime": "", "endtime": ""}
+        elif couponType == 'A': #"GBXJQ":
+            xjqResponse = query_by_tmq(shopID, crid, couponNum)
+            if xjqResponse.success == True:
+                return {
+                    "code": "1", 
+                    "message": "获取数据成功", 
+                    "cardno": xjqResponse.data['rcardno'], 
+                    "facevalue": xjqResponse.data['rmoney'], 
+                    "balance": xjqResponse.data['rye'] , 
+                    "starttime": '', 
+                    "endtime": xjqResponse.data['ryxrq']
+                }
+            else:
+                return {"code": "0", "message": f"{xjqResponse['message']}", "cardno": "", "facevalue": 0, "balance": 0 , "starttime": "", "endtime": ""}
+        else:
+            return {"code": "0", "message": f"没有找到相应的卡类型{couponType}", "cardno": "", "facevalue": 0, "balance": 0 , "starttime": "", "endtime": ""}
+    except Exception as e:
+        return {"success": -1, "message": f"异常: {e}", "cardno": "", "facevalue": 0, "balance": 0 , "starttime": "", "endtime": ""}
+
+
+# 获取可用优惠券类型（调用存储过程 MPos_Crm01_GetDiscountTypes ）
+@app.get("/coupon-types")
+def api_get_coupon_types(
+    lcMakt: str = Query(..., description="市场/货币代码（char(2)），例如系统中使用的市场代码"),
+):
+    data = GetCouponTypes(lcMakt)
+    if data is None:
+        count = 0
+    elif isinstance(data, (list, tuple, set, dict)):
+        count = len(data)
+    else:
+        try:
+            count = len(data)
+        except Exception:
+            count = 1
+    return {"success": True, "count": count, "data": data}
 
 
 @app.get("/member-lookup")
@@ -606,6 +666,71 @@ def api_sync_save_price(
     data = GetReceiptData(shopID, crid, invo)
     return data
     
+
+## 获取发票号（调用存储过程 MPos_Crm01_NewInvo）
+@app.get("/creat-new-invoid")
+def api_creat_new_invoid(
+    TransDate: date = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式，例如 2025-12-01"),
+    Shopid: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+):
+    invoid = CreateNewInvoid(TransDate, Shopid, Crid)
+    if invoid is None:
+        return {"success": True, "count": 0, "data": None}
+    return {"success": True, "count": 1, "data": invoid}
+
+
+## 提交发票数据（调用存储过程 MPos_Crm01_SubmitInvoice）
+@app.get("/submit-payment")
+def api_submit_payment(
+    TransDate: date = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式，例如 2025-12-01"),
+    Shopid: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+    CartID: str = Query(..., description="购物车 ID（uniqueidentifier），UUID 字符串"),
+    InvoiceID:int = Query(..., description="发票号"),
+    MemberCard: str = Query(..., description="会员卡号"),
+    MemberCardType: str = Query(..., description="会员卡类型"),
+    SalesAssociate: str = Query(..., description=""),
+    UsePromotion: str = Query(..., description=""),
+    Operator: str = Query(..., description="收银员"),
+    MarketID: str = Query(..., description="市场ID"),
+):
+    result = SubmitPayment(
+        TransDate,
+        Shopid,
+        Crid,
+        CartID,
+        InvoiceID,
+        MemberCard,
+        MemberCardType,
+        SalesAssociate,
+        UsePromotion,
+        Operator,
+        MarketID,
+    )
+    # 解析结果
+    if result['ReturnID']:
+        if result['ReturnID'] == 1:
+            return {"success": True, "result": result["ReturnMessage"]}
+        else:
+            return {"success": False, "result": f'提交失败：{result["ReturnMessage"]}'}
+    else:
+        return {"success": False, "result": f'脚本返回结果无法解析'}
+
+
+## 保存销售订单属性数据（调用存储过程 MPos_Crm01_InsertProperty）
+@app.get("/save-property")
+def api_save_property(
+    TransDate: date = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式，例如 2025-12-01"),
+    Shopid: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+    InvoiceID:int = Query(..., description="发票号"),
+    PropKey: str = Query(..., description="属性Key"),
+    PropValue: str = Query(..., description="属性值"),
+):
+    SaveProperty(TransDate, Shopid, Crid, InvoiceID, PropKey, PropValue)
+    return {"success": True}
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8081)
