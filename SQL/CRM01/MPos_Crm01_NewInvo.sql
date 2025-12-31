@@ -3,70 +3,82 @@ DROP PROC MPos_Crm01_NewInvo
 GO
 
 CREATE PROCEDURE MPos_Crm01_NewInvo
-  @PCSHOP char(5),
-  @PDTXDT smalldatetime,
-  @PCCRID char(3)
+   @PCSHOP   char(5),
+   @PDTXDT   smalldatetime,
+   @PCCRID   char(3),
+   @PNewInvo int = NULL OUTPUT -- 新增可选输出参数，默认 NULL
 AS
-    DECLARE @lnInvo int
-    DECLARE @lnShft int
-    DECLARE @lcMakt char(2)
-    DECLARE @ldMaxDate smalldatetime
+   DECLARE @lnInvo int
 
-    SELECT @lcMakt = shmakt
-    FROM   mfshop(nolock)
-    WHERE  shshop = @pcshop
+   DECLARE @lnShft int
 
-    CREATE TABLE #tinvo
-    (
-       tshft int NULL
-    )
+   DECLARE @lcMakt char(2)
 
-    SET nocount ON
+   DECLARE @ldMaxDate smalldatetime
 
-    SELECT @lnShft = dhshft
-    FROM   crcdwh(nolock)
-    WHERE  dhshop = @pcShop AND
-           dhtxdt = @pdTxdt AND
-           dhcrid = @pcCrid AND
-           rtrim(dhclrf) = ''
+   SELECT @lcMakt = shmakt
+   FROM   mfshop(nolock)
+   WHERE  shshop = @pcshop
 
-    IF @lnShft IS NULL
+   CREATE TABLE #tinvo
+   (
+      tshft int NULL
+   )
+
+   SET nocount ON
+
+   SELECT @lnShft = dhshft
+   FROM   crcdwh(nolock)
+   WHERE  dhshop = @pcShop AND
+          dhtxdt = @pdTxdt AND
+          dhcrid = @pcCrid AND
+          rtrim(dhclrf) = ''
+
+   IF @lnShft IS NULL
       INSERT #tinvo
              (tshft)
       EXEC MPos_Crm01_GetShift @pcShop,@pdTxdt,@pcCrid
 
-    IF upper(@lcMakt) = 'TH'
+   IF upper(@lcMakt) = 'TH'
       BEGIN
-          SELECT @ldMaxDate = max(shtxdt)
-          FROM   crsalh(nolock)
+         SELECT @ldMaxDate = max(shtxdt)
+         FROM   crsalh(nolock)
 
-          SELECT @lnInvo = max(shinvo)
-          FROM   crsalh(nolock)
-          WHERE  shshop = @pcShop AND
-                 shtxdt = @ldMaxDate AND
-                 shcrid = @pcCrid
+         SELECT @lnInvo = max(shinvo)
+         FROM   crsalh(nolock)
+         WHERE  shshop = @pcShop AND
+                shtxdt = @ldMaxDate AND
+                shcrid = @pcCrid
       END
-    ELSE
+   ELSE
       SELECT @lnInvo = max(shinvo)
       FROM   crsalh
       WHERE  shshop = @pcShop AND
              shtxdt = @pdTxdt AND
              shcrid = @pcCrid
 
-    IF @lnInvo = 9999  OR
-       @lnInvo IS NULL
+   IF @lnInvo = 9999  OR
+      @lnInvo IS NULL
       SELECT @lnInvo = 0
 
-    SELECT @lnInvo = @lnInvo + 1
+   SELECT @lnInvo = @lnInvo + 1
 
-    WHILE EXISTS ( SELECT *
-                   FROM   crsalh
-                   WHERE  shtxdt = @ldMaxDate AND
-                          shshop = @pcShop AND
-                          shcrid = @pcCrid AND
-                          shinvo = @lnInvo )
+   WHILE EXISTS ( SELECT *
+                  FROM   crsalh
+                  WHERE  shtxdt = @ldMaxDate AND
+                         shshop = @pcShop AND
+                         shcrid = @pcCrid AND
+                         shinvo = @lnInvo )
       SELECT @lnInvo = @lnInvo + 1
 
-    SELECT @lnInvo
+   IF @PNewInvo IS NOT NULL  OR
+      @@NESTLEVEL > 1
+      BEGIN
+         -- 如果外部传入了变量接收，或者处于嵌套调用中
+         SET @PNewInvo = @lnInvo;
 
-go 
+         RETURN;
+      END
+
+   SELECT @lnInvo 
+ 

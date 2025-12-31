@@ -73,6 +73,7 @@ AS
                      a.shinvo = @invoiceID AND
                      a.shupdt = 'Y' )
 
+
       BEGIN
          INSERT @return
                 (ReturnID,ReturnMessage)
@@ -97,17 +98,21 @@ AS
             --(
             --   Invo int
             --);
-            CREATE TABLE #t
-            (
-               Invo int
-            )
+            --CREATE TABLE #t
+            --(
+            --   Invo int
+            --)
 
-            INSERT INTO #t
+			SET @invoiceID = -1
+
             EXEC dbo.MPos_Crm01_NewInvo @PCSHOP = @shopID,-- char(5)
                                         @PDTXDT = @tranDate,-- smalldatetime
-                                        @PCCRID = @crid -- char(3)
-            SELECT @invoiceID = Invo
-            FROM   #t;
+                                        @PCCRID = @crid, -- char(3)
+										@PNewInvo = @invoiceID OUTPUT
+   --         SELECT @invoiceID = Invo
+   --         FROM   #t;
+
+			--DROP TABLE #t;
 
             INSERT dbo.crsalh
                    (shtxdt,shshop,shcrid,shinvo,shtxtm,shtqty,shamnt,shuser,shupdt,shvoid,shcust,shsalm,shiden,shforw)
@@ -125,6 +130,7 @@ AS
                      @salesAssociate,-- shsalm - char(40)
                      '',-- shiden - char(12)
                      '' -- shforw - char(10)
+
             )
          END
       ELSE
@@ -180,6 +186,7 @@ AS
                OPrice                money,
                OAmnt                 money,
                SaleType              char( 1 ),
+
                Line                  char( 3 ),
 
                [Change]              char( 1 ),
@@ -219,6 +226,7 @@ AS
              a.sdinvo = @invoiceID
 
       IF @usePromotion = 'Y'
+
          BEGIN
             INSERT dbo.crsald
 
@@ -268,6 +276,7 @@ AS
       FROM   dbo.crcinv a
       WHERE  a.TransDate = @tranDate AND
              a.Shop = @shopID AND
+
              a.Crid = @crid AND
 
              a.CartID = @cartID
@@ -333,6 +342,7 @@ AS
       RETURN
    END CATCH
 
+
    --7. 更新更表头表状态及填写累计金额
    BEGIN TRY
 
@@ -396,6 +406,7 @@ AS
              a.shshop = @shopID AND
              a.shcrid = @crid AND
              a.shinvo = @invoiceID
+
    END TRY
    BEGIN CATCH
       INSERT @return
@@ -446,4 +457,5 @@ AS
 
    SELECT a.ReturnID,a.ReturnMessage
    FROM   @return a 
+ 
  
