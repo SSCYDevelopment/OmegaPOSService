@@ -29,9 +29,11 @@ from db import GetReceiptData
 from db import GetMemberTypies
 import uvicorn
 from GBAPI import gb_router, find_member_info_brand, points_query, query_xfk_info, query_by_tmq
+from syncAPI import sync_router
 
 app = FastAPI()
 app.include_router(gb_router)
+app.include_router(sync_router)
 
 
 # 获取优惠券信息
