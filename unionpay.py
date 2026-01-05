@@ -16,7 +16,7 @@ from fastapi import APIRouter, Query
 DLL_FILENAME = 'MisPos.dll'
 CONFIG_FILENAME = 'conf.ini'
 
-sync_router = APIRouter(prefix="/gbunionpay", tags=["广百银联支付接口"])
+unionpay_router = APIRouter(prefix="/gbunionpay", tags=["广百银联支付接口"])
 
 
 class UnionPayDLL:
@@ -477,7 +477,7 @@ class UnionPayDLL:
                 self.logger.error(f"调用授权划付业务时出错: {e}")
                 raise
 
-@sync_router.get("/process_payment")
+@unionpay_router.post("/process_payment")
 def process_payment(ip_address, app_name, trans_id, amount, org_id='', dt='', ref_no='', mer_order_no='', out_info=''):
     """
     处理收款业务
@@ -490,7 +490,7 @@ def process_payment(ip_address, app_name, trans_id, amount, org_id='', dt='', re
         print(f"处理收款业务时出错: {e}")
         raise
 
-@sync_router.get("/process_auth_deduction")
+@unionpay_router.post("/process_auth_deduction")
 def process_auth_deduction(ip_address, app_name, trans_id, amount, hosp_number='', patient_name='', card_no='', out_info=''):
     """
     处理授权划付业务
