@@ -49,7 +49,7 @@ def api_get_coupon_info(
                     "endtime": xjqResponse.data['ryxrq']
                 }
             else:
-                return {"code": "0", "message": f"{xjqResponse['message']}", "cardno": "", "facevalue": 0, "balance": 0 , "starttime": "", "endtime": ""}
+                return {"code": "0", "message": f"{xjqResponse.message}", "cardno": "", "facevalue": 0, "balance": 0 , "starttime": "", "endtime": ""}
         else:
             return {"code": "0", "message": f"没有找到相应的卡类型{couponType}", "cardno": "", "facevalue": 0, "balance": 0 , "starttime": "", "endtime": ""}
     except Exception as e:
