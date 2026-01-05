@@ -1289,7 +1289,9 @@ def GetCouponTypes(lcMakt: str):
         raise e
 
 
-
+# 获取要同步广百的商品信息
+def GetGBPushProducts():
+    getProductSql = ''
 
 
 def SyncGetSales(ShopID: str, trandate: str, Crid: str, invoiceID: int):

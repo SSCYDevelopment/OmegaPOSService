@@ -11,9 +11,7 @@ import uuid
 from typing import Optional, Dict
 import config
 import time
-from GBModel import BaseResponse, FindMemberInfoBrandRequest, QueryXfkInfoRequest, PayWithXfkRequest, XfkWriteoffCancelRequest, GetXfkTradeConfirmInfoRequest, XfkSettlementRequest
-from GBModel import QueryByTmqRequest, PayWithTmqRequest, ReturnWithTmqRequest, GetTmqTradeConfirmInfoRequest, TmqSettlementRequest, GetSupplyInfo, BaseResponseByListData
-from GBModel import PointsQueryRequest, PointsDealRequest, PointsTradeQueryRequest, PointsSettlementRequest, EaccQueryBalanceRequest, EaccDealRequest, EaccGetTradeComfirmInfo, EaccDailySettlementRequest
+from GBModel import BaseResponse
 
 from db import GetGBConfig, SaveSupplyInfo
 
@@ -1624,11 +1622,11 @@ def eacc_daily_Settlement(
         )
 
 
-@gb_router.post("/", summary="商品推送接口", response_model=BaseResponse)
+@gb_router.get("/", summary="商品推送接口", response_model=BaseResponse)
 def push_products(
-    Shopid: str = Query(..., description="门店编号"),
-    Crid: str = Query(..., description="机器号"),
-    SettlementCnt: str = Query(..., description="日结次数"),
+    shopid: str = Query(..., description="门店编号"),
+    crid: str = Query(..., description="机器号"),
+    settlementCnt: str = Query(..., description="日结次数"),
 ):
     """
     商品推送接口
@@ -1643,7 +1641,7 @@ def push_products(
         字典格式的响应数据或错误信息
     """
     try:
-        if not Shopid:
+        if not shopid:
             return BaseResponse(
                 success=False,
                 code=0,
@@ -1651,14 +1649,14 @@ def push_products(
                 message='店铺ID不能为空'
             )
 
-        shopConfig = get_gb_config(Shopid, Crid)
+        shopConfig = get_gb_config(shopid, crid)
 
         if not shopConfig:
             return BaseResponse(
                 success=False,
                 code=0,
                 data=None,
-                message=f'获取店铺_机器配置为空，请检查店铺配置[{Shopid}|{Crid}]'
+                message=f'获取店铺_机器配置为空，请检查店铺配置[{shopid}|{crid}]'
             )
 
         # 获取要同步的商品数据
@@ -1704,6 +1702,8 @@ def push_products(
             data=None,
             message=f"接口调用异常: {str(e)}"
         )
+
+
 
 
 def gb_post(url: str, param: Optional[Dict[str, str]]):
