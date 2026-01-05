@@ -1,5 +1,5 @@
 import ctypes
-from ctypes import c_int, c_char_p, byref, cdll
+from ctypes import c_int, c_char_p, byref, cdll, WinDLL
 import configparser
 import os
 import logging
@@ -9,14 +9,69 @@ import json
 import threading
 import time
 
-from fastapi import APIRouter, Query
-
+# 导入FastAPI相关模块
+from fastapi import APIRouter
+from pydantic import BaseModel, Field
+from typing import Optional
 
 # 全局静态变量
 DLL_FILENAME = 'MisPos.dll'
 CONFIG_FILENAME = 'conf.ini'
 
-unionpay_router = APIRouter(prefix="/gbunionpay", tags=["广百银联支付接口"])
+
+# 定义支付结果解析模型
+class PaymentResult(BaseModel):
+    return_code: str = Field(..., description="返回码 00：成功；其他都是失败")
+    merchant_number: str = Field(..., description="商户号 15 位")
+    terminal_number: str = Field(..., description="终端号 8 位")
+    transaction_amount: str = Field(..., description="交易金额 单位：元；带小数点")
+    voucher_number: str = Field(..., description="凭证号 6 位")
+    system_reference_number: str = Field(..., description="系统参考号 12 位")
+    bank_card_number: Optional[str] = Field(None, description="银行卡号")
+    merchant_order_number: Optional[str] = Field(None, description="商户单号")
+    transaction_date: Optional[str] = Field(None, description="交易日期 yyyy/mm/dd")
+    transaction_time: Optional[str] = Field(None, description="交易时间 hh:mm:ss")
+    transaction_type_desc: Optional[str] = Field(None, description="交易分类")
+    payment_code: Optional[str] = Field(None, description="付款码")
+    transaction_type: Optional[str] = Field(None, description="交易类型")
+    payment_order_number: Optional[str] = Field(None, description="商户订单号")
+    device_number: Optional[str] = Field(None, description="机身号")
+
+
+# 定义请求模型
+class PaymentRequest(BaseModel):
+    ip_address: str = Field(..., description="刷卡机IP地址")
+    app_name: str = Field(..., description="应用名称")
+    trans_id: str = Field(..., description="交易名称")
+    amount: str = Field(..., description="交易金额 单位：分，不带小数点。如 1 元： 100")
+    org_id: Optional[str] = Field("", description="原始交易凭证号 撤销和退货必填；查询时，空或填入 000000 时，特指最后一笔。")
+    dt: Optional[str] = Field("", description="原交易日期 退货时必填：格式为 MMDD")
+    ref_no: Optional[str] = Field("", description="系统参考号 退货时必填：12 位系统参考号，银行卡20 位付款码，云闪付渠道流水号，聚银码")
+    mer_order_no: Optional[str] = Field("", description="商户订单号,商户系统的订单号，要求唯一。")
+    out_info: Optional[str] = Field("", description="输出信息")
+
+
+class AuthDeductionRequest(BaseModel):
+    ip_address: str = Field(..., description="刷卡机IP地址")
+    app_name: str = Field(..., description="应用名称")
+    trans_id: str = Field(..., description="交易名称")
+    amount: str = Field(..., description="交易金额 单位：分，不带小数点。如 1 元： 100")
+    hosp_number: Optional[str] = Field("", description="医院编号")
+    patient_name: Optional[str] = Field("", description="患者姓名")
+    card_no: Optional[str] = Field("", description="卡号")
+    out_info: Optional[str] = Field("", description="输出信息")
+
+
+# 定义响应模型
+class PaymentResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+    parsed_out_info: Optional[PaymentResult] = Field(None, description="解析后的支付结果信息")
+
+
+# 创建路由器
+unionpay_router = APIRouter(prefix="/unionpay", tags=["广百银联支付接口"])
 
 
 class UnionPayDLL:
@@ -54,21 +109,47 @@ class UnionPayDLL:
         # 使用IP文件夹中的DLL路径
         self.dll_path = os.path.join(self.ip_folder, os.path.basename(dll_path))
         
-        try:
-            # 加载DLL
-            self.mispos_dll = cdll.LoadLibrary(self.dll_path)
-        except OSError as e:
-            print(f"加载DLL失败: {e}")
-            raise
-
         # 设置日志
         self._setup_logging()
 
         # 读取配置文件
         self.config = self._load_config()
         
+        
+        # 在加载DLL前切换到DLL所在目录，确保DLL能找到同目录下的conf.ini
+        original_cwd = os.getcwd()  # 保存当前工作目录
+        os.chdir(self.ip_folder)    # 切换到DLL所在目录
+        
+        # 添加日志：打印当前工作目录和DLL路径信息
+        self.logger.info(f"当前工作目录: {os.getcwd()}")
+        self.logger.info(f"尝试加载DLL: {self.dll_path}")
+        if not os.path.exists(self.dll_path):
+            raise FileNotFoundError(f"DLL文件不存在: {self.dll_path}")
+        if not os.path.exists(os.path.join(self.ip_folder, CONFIG_FILENAME)):
+            self.logger.error(f"配置文件不存在: {os.path.join(self.ip_folder, CONFIG_FILENAME)}")
+        
+        try:
+            # 尝试加载DLL，优先使用CDLL（更兼容）
+            self.mispos_dll = cdll.LoadLibrary(self.dll_path)
+            self.logger.info(f"成功加载DLL: {self.dll_path}")
+        except OSError as e:
+            # 记录详细错误信息
+            self.logger.error(f"加载DLL失败: {e}")
+            # 尝试使用WinDLL作为备选方案
+            try:
+                self.mispos_dll = WinDLL(self.dll_path)
+                self.logger.info(f"使用WinDLL成功加载DLL: {self.dll_path}")
+            except Exception as ex:
+                self.logger.error(f"使用WinDLL加载也失败: {ex}")
+                raise
+        finally:
+            # 恢复原始工作目录
+            os.chdir(original_cwd)
+        
+        
         # 初始化时从持久化存储加载缓存数据
         self._load_cache_from_persistence()
+        
 
     def _is_valid_ip(self, ip):
         """
@@ -231,7 +312,9 @@ class UnionPayDLL:
         """
         try:
             config = configparser.ConfigParser()
-            config.read(config_path, encoding='utf-8')
+            # 使用GB2312编码读取配置文件
+            with open(config_path, 'r', encoding='gb2312') as f:
+                config.read_file(f)
             return config.get('net', 'ipaddr', fallback='')
         except Exception as e:
             print(f"读取配置文件失败: {e}")
@@ -239,21 +322,16 @@ class UnionPayDLL:
 
     def _update_config_ip(self):
         """
-        更新配置文件中的IP地址
+        更新配置文件中的IP地址，同时保留原有注释和格式
         """
         config_path = os.path.join(self.ip_folder, CONFIG_FILENAME)
         
         try:
-            config = configparser.ConfigParser()
-            # 检查配置文件是否存在，如果不存在则创建
-            if os.path.exists(config_path):
-                config.read(config_path, encoding='utf-8')
-            else:
-                # 如果配置文件不存在，从原始文件复制
-                original_config_path = os.path.join(os.path.dirname(__file__), 'GBunionpay', CONFIG_FILENAME)
-                if os.path.exists(original_config_path):
-                    shutil.copy2(original_config_path, config_path)
-                    config.read(config_path, encoding='utf-8')
+            # 使用RawConfigParser保持原始格式和注释
+            config = configparser.RawConfigParser()
+            # 使用GB2312编码读取配置文件
+            with open(config_path, 'r', encoding='gb2312') as f:
+                config.read_file(f)
         
             # 确保有net节
             if not config.has_section('net'):
@@ -262,8 +340,8 @@ class UnionPayDLL:
             # 更新IP地址
             config.set('net', 'ipaddr', self.ip_address)
             
-            # 保存配置文件
-            with open(config_path, 'w', encoding='utf-8') as configfile:
+            # 使用GB2312编码保存配置文件，保留原始格式和注释
+            with open(config_path, 'w', encoding='gb2312') as configfile:
                 config.write(configfile)
         except Exception as e:
             print(f"更新配置文件失败: {e}")
@@ -317,8 +395,9 @@ class UnionPayDLL:
         try:
             config_path = os.path.join(self.ip_folder, CONFIG_FILENAME)
             config = configparser.ConfigParser()
-            if os.path.exists(config_path):
-                config.read(config_path, encoding='utf-8')
+            # 使用GB2312编码读取配置文件
+            with open(config_path, 'r', encoding='gb2312') as f:
+                config.read_file(f)
             return config
         except Exception as e:
             print(f"加载配置文件失败: {e}")
@@ -390,8 +469,16 @@ class UnionPayDLL:
                     'dt': sdt.value.decode('utf-8') if sdt.value else '',
                     'ref_no': srefno.value.decode('utf-8') if srefno.value else '',
                     'mer_order_no': merorderno.value.decode('utf-8') if merorderno.value else '',
-                    'out_info': poutinfo.value.decode('utf-8') if poutinfo.value else ''
+                    'out_info_raw': poutinfo.value.decode('utf-8') if poutinfo.value else ''
                 }
+                
+                # 解析out_info字符串
+                try:
+                    parsed_out_info = self._parse_out_info(result_data['out_info_raw'])
+                    result_data['out_info'] = parsed_out_info
+                except Exception as e:
+                    self.logger.error(f"解析out_info失败: {e}")
+                    result_data['out_info'] = None
                 
                 self.logger.info(f"收款业务调用完成: result={result}, 返回数据={result_data}")
 
@@ -402,6 +489,44 @@ class UnionPayDLL:
             except Exception as e:
                 self.logger.error(f"调用收款业务时出错: {e}")
                 raise
+
+    def _parse_out_info(self, out_info_str):
+        """
+        解析out_info字符串，将其转换为对象
+        :param out_info_str: 原始的out_info字符串
+        :return: 解析后的PaymentResult对象
+        """
+        if not out_info_str:
+            return None
+            
+        # 按|分割字符串
+        parts = out_info_str.split('|')
+        
+        # 确保有足够的部分
+        if len(parts) < 13:
+            self.logger.warning(f"out_info格式不正确，部分数量不足: {len(parts)}")
+            return None
+        
+        # 创建PaymentResult对象
+        result = PaymentResult(
+            return_code=parts[0],
+            merchant_number=parts[1],
+            terminal_number=parts[2],
+            transaction_amount=parts[3],
+            voucher_number=parts[4],
+            system_reference_number=parts[5],
+            bank_card_number=parts[6],
+            merchant_order_number=parts[7],
+            transaction_date=parts[8],
+            transaction_time=parts[9],
+            transaction_type_desc=parts[10],
+            payment_code=parts[11],
+            transaction_type=parts[12],
+            payment_order_number=parts[13],
+            device_number=parts[14]
+        )
+        
+        return result
 
     def auth_deduction_transaction(self, app_name, trans_id, amount, hosp_number='', patient_name='', card_no='', out_info=''):
         """
@@ -477,7 +602,7 @@ class UnionPayDLL:
                 self.logger.error(f"调用授权划付业务时出错: {e}")
                 raise
 
-@unionpay_router.post("/process_payment")
+
 def process_payment(ip_address, app_name, trans_id, amount, org_id='', dt='', ref_no='', mer_order_no='', out_info=''):
     """
     处理收款业务
@@ -488,9 +613,8 @@ def process_payment(ip_address, app_name, trans_id, amount, org_id='', dt='', re
         return unionpay.payment_transaction(app_name, trans_id, amount, org_id, dt, ref_no, mer_order_no, out_info)
     except Exception as e:
         print(f"处理收款业务时出错: {e}")
-        raise
 
-@unionpay_router.post("/process_auth_deduction")
+
 def process_auth_deduction(ip_address, app_name, trans_id, amount, hosp_number='', patient_name='', card_no='', out_info=''):
     """
     处理授权划付业务
@@ -502,3 +626,57 @@ def process_auth_deduction(ip_address, app_name, trans_id, amount, hosp_number='
     except Exception as e:
         print(f"处理授权划付业务时出错: {e}")
         raise
+
+
+@unionpay_router.post("/payment", response_model=PaymentResponse, summary="收款业务接口", description="执行收款业务，处理支付请求")
+def payment_api(request: PaymentRequest):
+    """
+    收款业务接口
+    """
+    try:
+        unionpay = UnionPayDLL(request.ip_address)
+        
+        
+        
+        result = unionpay.payment_transaction(
+            app_name=request.app_name,
+            trans_id=request.trans_id,
+            amount=request.amount,
+            org_id=request.org_id,
+            dt=request.dt,
+            ref_no=request.ref_no,
+            mer_order_no=request.mer_order_no,
+            out_info=request.out_info
+        )
+        return PaymentResponse(success=True, message="支付成功", data=result)
+    except Exception as e:
+        return PaymentResponse(success=False, message=f"支付失败: {str(e)}")
+
+
+@unionpay_router.post("/auth_deduction", response_model=PaymentResponse, summary="授权划付业务接口", description="执行授权划付业务，处理授权划付请求")
+def auth_deduction_api(request: AuthDeductionRequest):
+    """
+    授权划付业务接口
+    """
+    try:
+        unionpay = UnionPayDLL(request.ip_address)
+        result = unionpay.auth_deduction_transaction(
+            app_name=request.app_name,
+            trans_id=request.trans_id,
+            amount=request.amount,
+            hosp_number=request.hosp_number,
+            patient_name=request.patient_name,
+            card_no=request.card_no,
+            out_info=request.out_info
+        )
+        return PaymentResponse(success=True, message="授权划付成功", data=result)
+    except Exception as e:
+        return PaymentResponse(success=False, message=f"授权划付失败: {str(e)}")
+
+
+@unionpay_router.get("/health", summary="健康检查接口", description="检查服务是否健康运行")
+def health_check():
+    """
+    健康检查接口
+    """
+    return {"status": "healthy", "service": "unionpay"}
