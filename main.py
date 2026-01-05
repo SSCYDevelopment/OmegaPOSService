@@ -9,6 +9,7 @@ from syncAPI import sync_router
 from PublicAPI import public_router
 from Crm01API import crm01_router
 from Crm02API import crm02_router
+from unionpay import unionpay_router
 
 
 app = FastAPI()
@@ -17,6 +18,7 @@ app.include_router(sync_router)
 app.include_router(public_router)
 app.include_router(crm01_router)
 app.include_router(crm02_router)
+app.include_router(unionpay_router)
 
 
 @app.get("/")
