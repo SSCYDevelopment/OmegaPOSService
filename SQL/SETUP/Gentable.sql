@@ -234,8 +234,7 @@ Create Table mfskun
      primary key clustered(skskun),
      foreign key (skstyl) references mfstyl(smstyl))
 Go
-CREATE UNIQUE INDEX mfskun1 ON mfskun (skstyl, skcolr, sksize)
-go
+
 
 /*
 --**--
