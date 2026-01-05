@@ -228,8 +228,8 @@ Go
 */
 Create Table mfskun
     (skstyl char(15),
-     skcolr char(3),
-     sksize char(3),
+     skcolr char(8),
+     sksize char(8),
      skskun char(21),
      primary key clustered(skskun),
      foreign key (skstyl) references mfstyl(smstyl))
