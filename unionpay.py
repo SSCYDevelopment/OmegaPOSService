@@ -124,10 +124,6 @@ unionpay_router = APIRouter(prefix="/unionpay", tags=["广百银联支付接口"
 
 
 class UnionPayDLL:
-    # 类级别的支付结果缓存，存储在内存中
-    _payment_cache = {}
-    # 用于缓存操作的全局锁
-    _cache_lock = threading.Lock()
     # 用于特定交易的锁，防止同一笔交易的并发处理
     _transaction_locks = {}
     # 保护 _transaction_locks 字典本身的锁
@@ -164,6 +160,14 @@ class UnionPayDLL:
         # 读取配置文件
         self.config = self._load_config()
         
+        
+        # 每个实例有独立的支付结果缓存
+        self._payment_cache = {}
+        # 用于缓存操作的锁
+        self._cache_lock = threading.Lock()
+        
+        # 设置实例的缓存文件夹路径
+        self._instance_folder = self.ip_folder
         
         
         
@@ -203,8 +207,7 @@ class UnionPayDLL:
         pattern = r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
         return re.match(pattern, ip) is not None
 
-    @classmethod
-    def _get_cache_key(cls, trans_id, mer_order_no):
+    def _get_cache_key(self, trans_id, mer_order_no):
         """
         生成缓存键
         """
@@ -212,84 +215,78 @@ class UnionPayDLL:
             raise ValueError("交易ID和商户订单号不能为空")
         return f"{trans_id}_{mer_order_no}"
 
-    @classmethod
-    def _get_payment_result_from_cache(cls, trans_id, mer_order_no):
+    def _get_payment_result_from_cache(self, trans_id, mer_order_no):
         """
         从缓存获取支付结果
         """
-        with cls._cache_lock:
-            key = cls._get_cache_key(trans_id, mer_order_no)
-            return cls._payment_cache.get(key)
+        with self._cache_lock:
+            key = self._get_cache_key(trans_id, mer_order_no)
+            return self._payment_cache.get(key)
 
-    @classmethod
-    def _get_transaction_lock(cls, trans_id, mer_order_no):
+    def _get_transaction_lock(self, trans_id, mer_order_no):
         """
         获取特定交易的锁，防止同一笔交易的并发处理
         """
-        key = cls._get_cache_key(trans_id, mer_order_no)
-        with cls._transaction_locks_lock:
-            if key not in cls._transaction_locks:
-                cls._transaction_locks[key] = threading.Lock()
-            return cls._transaction_locks[key]
+        key = self._get_cache_key(trans_id, mer_order_no)
+        with UnionPayDLL._transaction_locks_lock:
+            if key not in UnionPayDLL._transaction_locks:
+                UnionPayDLL._transaction_locks[key] = threading.Lock()
+            return UnionPayDLL._transaction_locks[key]
 
-    @classmethod
-    def _store_payment_result_to_cache(cls, trans_id, mer_order_no, result_data):
+    def _store_payment_result_to_cache(self, trans_id, mer_order_no, result_data):
         """
         将支付结果存储到缓存
         """
-        with cls._cache_lock:
-            key = cls._get_cache_key(trans_id, mer_order_no)
+        with self._cache_lock:
+            key = self._get_cache_key(trans_id, mer_order_no)
             # 添加时间戳，以便后续清理过期缓存
             result_data['timestamp'] = datetime.now().isoformat()
-            cls._payment_cache[key] = result_data
+            self._payment_cache[key] = result_data
             # 同时持久化到文件
-            cls._save_cache_to_persistence()
+            self._save_cache_to_persistence()
 
-    @classmethod
-    def _save_cache_to_persistence(cls):
+    def _save_cache_to_persistence(self):
         """
         将缓存数据持久化到文件
         """
-        cache_file = os.path.join(os.path.dirname(__file__), 'payment_cache.json')
+        cache_file = os.path.join(self._instance_folder, 'payment_cache.json')
         try:
             # 使用临时文件和原子操作，防止写入过程中程序崩溃导致数据丢失
             temp_file = cache_file + '.tmp'
             with open(temp_file, 'w', encoding='utf-8') as f:
-                json.dump(cls._payment_cache, f, ensure_ascii=False, indent=2)
+                json.dump(self._payment_cache, f, ensure_ascii=False, indent=2)
             # 原子操作：重命名临时文件为实际文件
             os.replace(temp_file, cache_file)
         except Exception as e:
             print(f"持久化缓存失败: {e}")
 
-    @classmethod
-    def _load_cache_from_persistence(cls):
+    def _load_cache_from_persistence(self):
         """
         从持久化文件加载缓存数据
         """
-        cache_file = os.path.join(os.path.dirname(__file__), 'payment_cache.json')
+        cache_file = os.path.join(self._instance_folder, 'payment_cache.json')
         try:
             if os.path.exists(cache_file):
                 with open(cache_file, 'r', encoding='utf-8') as f:
-                    cls._payment_cache = json.load(f)
+                    self._payment_cache = json.load(f)
                     
                 # 清理过期的缓存数据（超过24小时的）
-                cls._cleanup_expired_cache()
+                self._cleanup_expired_cache()
         except (json.JSONDecodeError, ValueError) as e:
             print(f"从持久化文件加载缓存失败，可能是文件格式错误: {e}")
-            cls._payment_cache = {}
+            self._payment_cache = {}
         except Exception as e:
             print(f"从持久化文件加载缓存失败: {e}")
-            cls._payment_cache = {}
+            self._payment_cache = {}
 
-    @classmethod
-    def _cleanup_expired_cache(cls):
+    def _cleanup_expired_cache(self):
         """
         清理过期的缓存数据
         """
         current_time = datetime.now()
         expired_keys = []
         
-        for key, data in cls._payment_cache.items():
+        for key, data in self._payment_cache.items():
             if 'timestamp' in data:
                 try:
                     timestamp = datetime.fromisoformat(data['timestamp'])
@@ -302,11 +299,11 @@ class UnionPayDLL:
         
         # 删除过期的缓存
         for key in expired_keys:
-            del cls._payment_cache[key]
+            del self._payment_cache[key]
         
         # 如果删除了过期数据，需要重新保存
         if expired_keys:
-            cls._save_cache_to_persistence()
+            self._save_cache_to_persistence()
 
     def _setup_ip_folder(self):
         """
@@ -470,8 +467,6 @@ class UnionPayDLL:
             print(f"加载配置文件失败: {e}")
             raise
 
-
-
     def my_mispos_transaction(self, app_name, trans_id, time_str, json_data):
         """
         MyMisPos接口主函数
@@ -524,19 +519,20 @@ class UnionPayDLL:
                 )
 
                 # 解码返回的JSON字符串
-                out_data_str = out_buffer.value.decode('gb2312') if out_buffer.value else ''
+                out_data_str = out_buffer.value.decode('gbk') if out_buffer.value else ''
 
                 # 记录返回结果日志
                 result_data = {
                     'result': result,
-                    'app_name': s_app_name.value.decode('gb2312') if s_app_name.value else '',
-                    'trans_id': s_trans_id.value.decode('gb2312') if s_trans_id.value else '',
-                    'time': s_time.value.decode('gb2312') if s_time.value else '',
-                    'json_data': s_json_data.value.decode('gb2312') if s_json_data.value else '',
+                    'app_name': s_app_name.value.decode('gbk') if s_app_name.value else '',
+                    'trans_id': s_trans_id.value.decode('gbk') if s_trans_id.value else '',
+                    'time': s_time.value.decode('gbk') if s_time.value else '',
+                    'json_data': s_json_data.value.decode('gbk') if s_json_data.value else '',
                     'out_data': out_data_str
                 }
 
                 # 解析返回的JSON数据
+                parsed_result = None
                 try:
                     import json as json_lib
                     if out_data_str:
@@ -578,10 +574,15 @@ class UnionPayDLL:
 
                 self.logger.info(f"MyMisPos业务调用完成: result={result}, 返回数据={result_data}")
 
-                # 只有交易成功(resCode="00")时才将结果写入缓存
-                if parsed_result and parsed_result.res_code == "00":
+                # 只有交易成功(resCode="00")且json_data不为空时才将结果写入缓存
+                if parsed_result and parsed_result.res_code == "00" and json_data:
                     # 将结果存储到缓存中
                     self._store_payment_result_to_cache(trans_id, cache_key, result_data)
+                else:
+                    if not json_data:
+                        self.logger.info(f"json_data为空，不存储到缓存: trans_id={trans_id}, cache_key={cache_key}")
+                    else:
+                        self.logger.info(f"交易失败或未成功解析结果，不存储到缓存: trans_id={trans_id}, cache_key={cache_key}")
 
                 return result_data
             except Exception as e:
@@ -614,11 +615,11 @@ def payment_api(request: PaymentRequest):
             # 交易成功
             return PaymentResponse(success=True, message="广百收款业务调用成功", data=result)
         else:
-            # 交易失败时，返回错误信息，但parsed_out_info设为None以避免类型错误
+            # 交易失败时，返回错误信息
             message = "广百收款业务调用失败"
             if parsed_result:
                 message += f": {parsed_result.res_msg}"
-            return PaymentResponse(success=False, message=message, data=result, parsed_out_info=None)
+            return PaymentResponse(success=False, message=message, data=result)
     except Exception as e:
         return PaymentResponse(success=False, message=f"广百收款业务调用失败: {str(e)}")
 
@@ -629,9 +630,9 @@ def bankcard_payment_api(request: BankCardPaymentRequest):
     银行卡收款接口
     sAppName固定为01，sTransId固定为31
     """
-    # 验证参数
-    if request.s_amt <= "0.00":
-        return PaymentResponse(success=False, message="交易金额必须大于0", data=None, parsed_out_info=None)
+    # 验证参数，将字符串转换为浮点数进行比较
+    if float(request.s_amt) <= 0.00:
+        return PaymentResponse(success=False, message="交易金额必须大于0", data=None)
     
     try:
         unionpay = UnionPayDLL(request.ip_address)
@@ -651,11 +652,11 @@ def bankcard_payment_api(request: BankCardPaymentRequest):
             # 交易成功
             return PaymentResponse(success=True, message="银行卡收款业务调用成功", data=result)
         else:
-            # 交易失败时，返回错误信息，但parsed_out_info设为None以避免类型错误
+            # 交易失败时，返回错误信息
             message = "银行卡收款业务调用失败"
             if parsed_result:
                 message += f": {parsed_result.res_msg}"
-            return PaymentResponse(success=False, message=message, data=result, parsed_out_info=None)
+            return PaymentResponse(success=False, message=message, data=result)
     except Exception as e:
         return PaymentResponse(success=False, message=f"银行卡收款业务调用失败: {str(e)}")
 
@@ -666,9 +667,9 @@ def bankcard_refund_api(request: BankCardRefundRequest):
     银行卡退款接口
     sAppName固定为01，sTransId固定为34（假设为退货交易ID）
     """
-    # 验证参数
-    if request.s_amt <= "0.00":
-        return PaymentResponse(success=False, message="交易金额必须大于0", data=None, parsed_out_info=None)
+    # 验证参数，将字符串转换为浮点数进行比较
+    if float(request.s_amt) <= 0.00:
+        return PaymentResponse(success=False, message="交易金额必须大于0", data=None)
     
     try:
         unionpay = UnionPayDLL(request.ip_address)
@@ -688,11 +689,11 @@ def bankcard_refund_api(request: BankCardRefundRequest):
             # 交易成功
             return PaymentResponse(success=True, message="银行卡退款业务调用成功", data=result)
         else:
-            # 交易失败时，返回错误信息，但parsed_out_info设为None以避免类型错误
+            # 交易失败时，返回错误信息
             message = "银行卡退款业务调用失败"
             if parsed_result:
                 message += f": {parsed_result.res_msg}"
-            return PaymentResponse(success=False, message=message, data=result, parsed_out_info=None)
+            return PaymentResponse(success=False, message=message, data=result)
     except Exception as e:
         return PaymentResponse(success=False, message=f"银行卡退款业务调用失败: {str(e)}")
 
@@ -703,13 +704,13 @@ def scancode_payment_api(request: ScanCodePaymentRequest):
     扫码收款接口
     sAppName固定为01，sTransId固定为51（扫码消费）
     """
-    # 验证参数
-    if request.s_amt <= "0.00":
-        return PaymentResponse(success=False, message="交易金额必须大于0", data=None, parsed_out_info=None)
+    # 验证参数，将字符串转换为浮点数进行比较
+    if float(request.s_amt) <= 0.00:
+        return PaymentResponse(success=False, message="交易金额必须大于0", data=None)
     
     # 验证支付渠道参数
     if request.s_type not in ["01", "02"]:
-        return PaymentResponse(success=False, message="支付渠道参数错误：01—支付宝,02—微信", data=None, parsed_out_info=None)
+        return PaymentResponse(success=False, message="支付渠道参数错误：01—支付宝,02—微信", data=None)
     
     try:
         unionpay = UnionPayDLL(request.ip_address)
@@ -729,11 +730,11 @@ def scancode_payment_api(request: ScanCodePaymentRequest):
             # 交易成功
             return PaymentResponse(success=True, message="扫码收款业务调用成功", data=result)
         else:
-            # 交易失败时，返回错误信息，但parsed_out_info设为None以避免类型错误
+            # 交易失败时，返回错误信息
             message = "扫码收款业务调用失败"
             if parsed_result:
                 message += f": {parsed_result.res_msg}"
-            return PaymentResponse(success=False, message=message, data=result, parsed_out_info=None)
+            return PaymentResponse(success=False, message=message, data=result)
     except Exception as e:
         return PaymentResponse(success=False, message=f"扫码收款业务调用失败: {str(e)}")
 
@@ -744,13 +745,13 @@ def scancode_refund_api(request: ScanCodeRefundRequest):
     扫码退款接口
     sAppName固定为01，sTransId固定为54（扫码退货）
     """
-    # 验证参数
-    if request.s_amt <= "0.00":
-        return PaymentResponse(success=False, message="交易金额必须大于0", data=None, parsed_out_info=None)
+    # 验证参数，将字符串转换为浮点数进行比较
+    if float(request.s_amt) <= 0.00:
+        return PaymentResponse(success=False, message="交易金额必须大于0", data=None)
     
     # 验证支付渠道参数
     if request.s_type not in ["01", "02"]:
-        return PaymentResponse(success=False, message="支付渠道参数错误：01—支付宝,02—微信", data=None, parsed_out_info=None)
+        return PaymentResponse(success=False, message="支付渠道参数错误：01—支付宝,02—微信", data=None)
     
     try:
         unionpay = UnionPayDLL(request.ip_address)
@@ -768,13 +769,13 @@ def scancode_refund_api(request: ScanCodeRefundRequest):
         parsed_result = result.get('parsed_result')
         if parsed_result and hasattr(parsed_result, 'res_code') and parsed_result.res_code == "00":
             # 交易成功
-            return PaymentResponse(success=True, message="扫码退款业务调用成功", data=result, parsed_out_info=payment_result)
+            return PaymentResponse(success=True, message="扫码退款业务调用成功", data=result)
         else:
-            # 交易失败时，返回错误信息，但parsed_out_info设为None以避免类型错误
+            # 交易失败时，返回错误信息
             message = "扫码退款业务调用失败"
             if parsed_result:
                 message += f": {parsed_result.res_msg}"
-            return PaymentResponse(success=False, message=message, data=result, parsed_out_info=None)
+            return PaymentResponse(success=False, message=message, data=result)
     except Exception as e:
         return PaymentResponse(success=False, message=f"扫码退款业务调用失败: {str(e)}")
 
