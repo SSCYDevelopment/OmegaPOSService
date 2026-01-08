@@ -607,12 +607,13 @@ def api_list_discount(pcShop: str, pcUser: str = "", pcDefective: str = ""):
 
 
 @crm01_router.get("/get-receipt-data")
-def api_sync_save_price(
+def api_get_receipt_data(
+    transDate: str = Query(..., description="交易日期（smalldatetime），建议 ISO 格式，例如 2025-12-01"),
     shopID: str = Query(..., description="店铺代码（varchar(10)），例如门店编号"),
     crid: str = Query(..., description="款号/货号（varchar(15)），款式编号"),
     invo: int = Query(..., description="发票号"),
 ):
-    data = GetReceiptData(shopID, crid, invo)
+    data = GetReceiptData(transDate, shopID, crid, invo)
     return data
 
 

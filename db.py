@@ -983,21 +983,21 @@ def GetGBConfig(shopid:str, crid:str):
             conn.close()
 
 
-def GetReceiptData(shopID : str, crid : str, invo : str):
+def GetReceiptData(TransDate: str,shopID : str, crid : str, invo : str):
     conn = None
     cursor = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
-        sql = "EXEC MPos_Crm01_GetReceiptData ?, ?, ?"
+        sql = "EXEC MPos_Crm01_GetReceiptData ?, ?, ?, ?"
 
         # result_sets = []
 
         try:
-            cursor.execute(sql, (shopID, crid, invo))
+            cursor.execute(sql, (TransDate, shopID, crid, invo))
         except Exception as sql_ex:
-            logging.error(f"SQL Execute Error: {sql} | Params: {shopID}, {crid}, {invo} | Error: {str(sql_ex)}")
+            logging.error(f"SQL Execute Error: {sql} | Params: {TransDate}, {shopID}, {crid}, {invo} | Error: {str(sql_ex)}")
             # raise Exception("SQL 执行错误，请联系系统管理员")
             return {
                             'success': False,

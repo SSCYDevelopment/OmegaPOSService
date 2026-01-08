@@ -1,7 +1,8 @@
 CREATE PROCEDURE dbo.MPos_Crm01_GetReceiptData
-   @pShopid varchar(21),
-   @pCrid   char(3),
-   @pInvo   int
+   @TransDate smalldatetime,
+   @pShopid   varchar(21),
+   @pCrid     char(3),
+   @pInvo     int
 AS
    SET NOCOUNT ON
 
@@ -40,7 +41,8 @@ AS
                       FROM   dbo.crsalh(NOLOCK)
                       WHERE  shshop = @pShopid AND
                              shcrid = @pCrid AND
-                             shinvo = @pInvo )
+                             shinvo = @pInvo AND
+                             shtxdt = @TransDate )
          BEGIN
             SELECT 0 code,'没有找到相应的销售数据' msg
 
@@ -52,11 +54,12 @@ AS
       INSERT #receiptH
              (ShopId,SalesData,InvoiceNo,Salesperson,Cashier,Qty,Amount)
       -- 销售主表
-      SELECT shshop,CONVERT(VARCHAR(19), shtxdt, 120),shinvo,shuser,shuser,shtqty,shamnt
+      SELECT shshop,CONVERT(varchar(19), shtxdt, 120),shinvo,shuser,shuser,shtqty,shamnt
       FROM   dbo.crsalh(NOLOCK)
       WHERE  shshop = @pShopid AND
              shcrid = @pCrid AND
-             shinvo = @pInvo
+             shinvo = @pInvo AND
+             shtxdt = @TransDate
 
       INSERT #receiptD
              (ShopId,Seqn,SType,ProductSkuId,UnitPrice,Qty,TotalPrice)
@@ -65,14 +68,15 @@ AS
       FROM   dbo.crsald(NOLOCK)
       WHERE  sdshop = @pShopid AND
              sdcrid = @pCrid AND
-             sdinvo = @pInvo
+             sdinvo = @pInvo AND
+
+             sdtxdt = @TransDate
 
       -- 店铺信息更新
       UPDATE a
       SET    a.ShopName = b.shldes,
              a.ShopTele = b.shtele
       FROM   #receiptH a,
-
              dbo.mfshop(NOLOCK) b
       WHERE  a.ShopId = b.shshop
 
@@ -129,6 +133,7 @@ AS
 
       SELECT *
       FROM   #receiptH
+
 
       SELECT *
       FROM   #receiptD

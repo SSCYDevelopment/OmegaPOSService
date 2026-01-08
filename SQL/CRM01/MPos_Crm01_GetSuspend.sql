@@ -7,6 +7,8 @@ CREATE PROC MPos_crm01_GetSuspend
   @Shop      char(5),
   @Crid      char(3)
 AS
+    SET NOCOUNT ON;
+    
     CREATE TABLE #t
     (
        tcardID  varchar( 36 ),
