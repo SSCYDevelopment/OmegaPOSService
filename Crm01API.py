@@ -291,6 +291,7 @@ def api_save_cart_item(
     SupplierID: str = Query("", description="供应商 ID（varchar(8)，可选）"),
     PantsLength: int = Query(0, description="裤长（int，可选），适用于裤装类的额外长度信息，默认 0"),
     isEShop: str = Query("", description="是否来自电商（char(1)，可选），如 'Y'/'N' 表示电商来源标记"),
+    Salm : str = Query("", description="销售人员"),
 ):
     result = SaveCartItem(
         TransDate,
@@ -333,6 +334,7 @@ def api_save_cart_item(
         SupplierID,
         PantsLength,
         isEShop,
+        Salm,
     )
 
     return {"success": True, "result": result}

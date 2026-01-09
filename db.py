@@ -177,7 +177,8 @@ def SaveCartItem(
     BrandBit: int = -1,
     SupplierID: str = '',
     PantsLength: int = 0,
-    isEShop: str = ''
+    isEShop: str = '',
+    Salm:str = '',
 ):
     """Call stored procedure MPos_Crm01_SaveCartItem.
 
@@ -190,7 +191,7 @@ def SaveCartItem(
 
         sql = (
             "EXEC MPos_Crm01_SaveCartItem " + 
-            ", ".join(["?" for _ in range(40)])
+            ", ".join(["?" for _ in range(41)])
         )
 
         params = (
@@ -234,6 +235,7 @@ def SaveCartItem(
             SupplierID,
             PantsLength,
             isEShop,
+            Salm,
         )
 
         try:
