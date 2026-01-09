@@ -312,6 +312,7 @@ CREATE TABLE dbo.crcart
    Calced           CHAR( 1 ) DEFAULT '',
    [Message]        nvarchar( 100 ) DEFAULT '',
    IsEshop          CHAR( 1 ) DEFAULT '',
+   Salm             varchar( 20 ),
    PRIMARY KEY CLUSTERED(TransDate, Shop, Crid, CartID, Seqn)
 )
 
@@ -335,7 +336,8 @@ CREATE TABLE crcarh
    [ALINUMBER]  varchar( 100 ) DEFAULT '',
    [ALICUST]    varchar( 100 ) DEFAULT '',
    [ALIETF]     varchar( 100 ) DEFAULT '',
-   [ALITYPE]    char( 1 ) DEFAULT ''
+   [ALITYPE]    char( 1 ) DEFAULT '',
+   SuspendNum   VARCHAR(50) DEFAULT ''
    PRIMARY KEY CLUSTERED(TransDate, Shop, Crid, CartID)
 )
 

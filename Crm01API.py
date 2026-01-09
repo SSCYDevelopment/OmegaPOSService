@@ -5,7 +5,7 @@ from typing import Union
 from fastapi import APIRouter, Query
 from db import CreateNewInvoid, ListDiscount, SaveProperty, SubmitPayment, GetCouponTypes, DeleteCartItem, GetCartItems, SaveCartItem, SaveCartPayment, SaveCartMemberCard
 from db import SaveDiscountTicket, SaveCartInfo, RemoveDiscountTicket, GetPaymentType, GetSuspend, CleanCart, CleanCartPayment, InsertInvoiceProperty, DeleteInvoiceProperty
-from db import GetShift, NewInvo, GetInvoiceByIden, GetReceiptData, GetMemberTypies
+from db import GetShift, NewInvo, GetInvoiceByIden, GetReceiptData, GetMemberTypies, SaveCartSuspendNum
 from GBAPI import find_member_info_brand, points_query, query_xfk_info, query_by_tmq
 
 
@@ -356,6 +356,7 @@ def api_save_cart_info(
     ReceiverName: str = Query('', description="收货人姓名（nvarchar(10)，可选）"),
     Address: str = Query('', description="收货地址（nvarchar(200)，可选）"),
     Remark: str = Query('', description="备注（nvarchar(200)，可选）"),
+    SuspendNum: str = Query('', description="挂起号，可选"),
 ):
     result = SaveCartInfo(
         TransDate,
@@ -371,8 +372,22 @@ def api_save_cart_info(
         ReceiverName,
         Address,
         Remark,
+        SuspendNum,
     )
 
+    return {"success": True, "result": result}
+
+
+## 保存/更新购物车挂起号（调用存储过程 MPos_crm01_SaveCartMemberCard）
+@crm01_router.get("/save-cart-suspend-num")
+def api_save_cart_membercard(
+    TransDate: str = Query(..., description="交易/销售日期（smalldatetime），建议 ISO 格式"),
+    Shop: str = Query(..., description="店铺代码（char(5）），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+    CartID: str = Query(..., description="购物车 ID（uniqueidentifier），UUID 字符串"),
+    SuspendNum: str = Query(..., description="挂起号"),
+):
+    result = SaveCartSuspendNum(TransDate, Shop, Crid, CartID, SuspendNum)
     return {"success": True, "result": result}
 
 

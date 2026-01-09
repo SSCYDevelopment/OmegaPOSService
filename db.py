@@ -267,14 +267,15 @@ def SaveCartInfo(
     Mobile: str = '',
     ReceiverName: str = '',
     Address: str = '',
-    Remark: str = ''
+    Remark: str = '',
+    SuspendNum: str = ''
 ):
     """Call stored procedure MPos_Crm01_SaveCartInfo to insert/update crcarh."""
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
-        sql = "EXEC MPos_Crm01_SaveCartInfo " + ", ".join(["?" for _ in range(13)])
+        sql = "EXEC MPos_Crm01_SaveCartInfo " + ", ".join(["?" for _ in range(14)])
 
         params = (
             TransDate,
@@ -290,6 +291,7 @@ def SaveCartInfo(
             ReceiverName,
             Address,
             Remark,
+            SuspendNum,
         )
 
         try:
@@ -1352,3 +1354,25 @@ def SyncGetSales(ShopID: str, trandate: str, Crid: str, invoiceID: int):
                 pass
         raise e
 
+
+def SaveCartSuspendNum(TransDate, Shop, Crid, CartID, SuspendNum):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_crm01_SaveCartSuspendNum ?, ?, ?, ?, ?"
+
+        try:
+            cursor.execute(sql, (TransDate, Shop, Crid, CartID, SuspendNum))
+            conn.commit()
+        except Exception as sql_ex:
+            logging.error(f"SQL Execute Error: {sql} | Params: {TransDate}, {Shop}, {Crid}, {CartID}, {SuspendNum} | Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        cursor.close()
+        conn.close()
+
+        return True
+
+    except Exception as e:
+        raise e
