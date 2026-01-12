@@ -1355,6 +1355,40 @@ def SyncGetSales(ShopID: str, trandate: str, Crid: str, invoiceID: int):
         raise e
 
 
+def SyncGetSalesList(ShopID: str, fromDate: str, toDate: str):
+    """Call stored procedure MPos_Sync_GetSalesList to get sales list updated within a date range.
+
+    Parameters:
+    - ShopID: shop code (varchar(5))
+    - fromDate: smalldatetime string (ISO recommended)
+    - toDate: smalldatetime string (ISO recommended)
+
+    Returns: list[dict]
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_Sync_GetSalesList ?, ?, ?"
+
+        try:
+            cursor.execute(sql, (ShopID, fromDate, toDate))
+        except Exception as sql_ex:
+            logging.error(f"SQL Execute Error: {sql} | Params: {ShopID}, {fromDate}, {toDate} | Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        columns = [col[0] for col in cursor.description] if cursor.description else []
+        rows = cursor.fetchall() if cursor.description else []
+
+        cursor.close()
+        conn.close()
+
+        return [dict(zip(columns, row)) for row in rows]
+
+    except Exception as e:
+        raise e
+
+
 def SaveCartSuspendNum(TransDate, Shop, Crid, CartID, SuspendNum):
     try:
         conn = get_connection()
@@ -1376,3 +1410,5 @@ def SaveCartSuspendNum(TransDate, Shop, Crid, CartID, SuspendNum):
 
     except Exception as e:
         raise e
+    
+    
