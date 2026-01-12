@@ -201,7 +201,7 @@ Create Table mfstyl
      smline char(3),
      smseas char(1),
      smsprc money,
-     smcore char(1),  -- 1 - 创作部物料   2 - 购物包  6 -  购物券  C ，I -  货品 , smcate ='00' and (smcore='1' or smcore='2' or smcore='3' or smcore='4' or smcore='5') 不计算库存  
+     smcore char(1),  -- 1 - 创作部物料   2 - 购物包  6 -  购物券  C ，I -  货品 , smcate ='00' and (smcore='1' or smcore='2' or smcore='3' or smcore='4' or smcore='5') 不计算库存  W 称重
      smyear smalldatetime,
      smcanx char(1),
      Primary Key Clustered(smstyl),
