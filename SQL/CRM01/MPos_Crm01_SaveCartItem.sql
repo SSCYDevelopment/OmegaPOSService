@@ -62,6 +62,7 @@ AS
             BEGIN
                SELECT @Seqn = MAX(Seqn)
 
+
                FROM   crcart
                WHERE  TransDate = @TransDate AND
                       Shop = @Shop AND
@@ -80,7 +81,7 @@ AS
           Seqn = @Seqn;
 
    INSERT crcart
-          (TransDate,Shop,Crid,CartID,Seqn,ItemType,Sku,StyleCode,Color,Size,Price,Discount,Qty,DiscountType,PromotionCode,Amnt,OPrice,OAmnt,SaleType,Line,Change,Brand,Cate,Ptype,DMark,Commision,PromotionID,DiscountID,DiscountBrandBit,DiscountPtyp,GPrice,LostSales,CumulateValue,VoucherID,BrandBit,SupplierID,PantsLength,Calced,[Message],InputTime,IsEshop,Salm)
+          (TransDate,Shop,Crid,CartID,Seqn,ItemType,Sku,StyleCode,Color,Size,Price,Discount,Qty,DiscountType,PromotionCode,Amnt,OPrice,OAmnt,SaleType,Line,Change,Brand,Cate,Ptype,[Weight],Commision,PromotionID,DiscountID,DiscountBrandBit,DiscountPtyp,GPrice,LostSales,CumulateValue,VoucherID,BrandBit,SupplierID,PantsLength,Calced,[Message],InputTime,IsEshop,Salm)
    SELECT @TransDate,@Shop,@Crid,@CartID,@Seqn,@ItemType,@skuBarcode,@StyleCode,@Color,@Size,@Price,@Discount,@qty,@DiscountType,@PromotionCode,@Amnt,@OPrice,@OAmnt,@SaleType,@Line,@Change,@Brand,@Cate,@Ptype,@Weight,@Commision,@PromotionID,@DiscountID,@DiscountBrandBit,@DiscountPtyp,@GPrice,@LostSales,@CumulateValue,@VoucherID,@BrandBit,@SupplierID,@PantsLength,@Calced,@Message,GETDATE(),@isEShop,@Salm;
 
    IF NOT EXISTS ( SELECT *
@@ -97,8 +98,7 @@ AS
 
    COMMIT TRAN; 
  
-GO 
-
+ 
 --test
 --PRINT NEWID()
 --'F7DCD6D6-9042-43E4-82F1-09D65847F08C'

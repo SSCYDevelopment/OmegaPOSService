@@ -108,7 +108,9 @@ AS
       [Message]               nvarchar( 100 ) DEFAULT '',
       [PPrice]                money DEFAULT 0,
       [IsEshop]               char( 1 ) DEFAULT '',
-      [Salm]                  varchar( 20 ) DEFAULT ''
+      [Salm]                  varchar( 20 ) DEFAULT '',
+      [Weight]                money,
+	  [IsWeight]              varchar( 2 ) DEFAULT '0'
    )
 
    ----放入备算表                                                                            
@@ -122,13 +124,13 @@ AS
    ----计算promotion                                                                              
    DECLARE @phtxnt char(8)
 
+
+
    DECLARE @phtype int
 
    DECLARE @phfdat smalldatetime
 
    DECLARE @phtdat smalldatetime
-
-
 
    DECLARE @phtime smallint
 
@@ -222,11 +224,11 @@ AS
                IF @debug = 'Y'
                   BEGIN
                      SELECT @phtxnt
+
+
                   END
 
                SELECT @lnPromoBeforeQty = 0,@lnPromoAfterQty = -1
-
-
 
                WHILE (@lnPromoBeforeQty <> @lnPromoAfterQty)
                   BEGIN
@@ -275,9 +277,9 @@ AS
                                        FROM   @Items
                                        WHERE  Dbo.MPOS_CRM01_CheckPromotionSkuMatch(@pdscop, itskun, ItStyl, Ittype) = 1 AND
                                               Itquty > Ituqty AND
+
+
                                               Itbuse <> 'Y'
-
-
                                     END
 
                                  SELECT @lnMinSequ = Min(Itnseq)
@@ -495,7 +497,8 @@ AS
           a.Calced = b.Calced,
           a.Message = b.Message,
           a.IsEshop = b.IsEshop,
-		  a.Salm = b.Salm
+          a.Salm = b.Salm,
+          a.Weight = b.Weight
    FROM   #crcart a,
           crcart b
    WHERE  a.Seqn = b.Seqn AND
@@ -513,8 +516,8 @@ AS
           PromotionID <> ''
 
    INSERT #crcart
-          ([InputTime],[seqn],[ItemType],[Sku],[StyleCode],[Color],[Size],[Price],[Discount],[Qty],[DiscountType],[PromotionCode],[Amnt],[OPrice],[OAmnt],[SaleType],[Line],[Change],[Brand],[Cate],[Ptype],[DMark],[Commision],[PromotionID],[DiscountID],[DiscountBrandBit],[DiscountPtyp],[GPrice],[LostSales],[CumulateValue],[VoucherID],[BrandBit],[SupplierID],[PantsLength],[Calced],[Message],[IsEshop],[Salm])
-   SELECT [InputTime],[seqn],[ItemType],[Sku],[StyleCode],[Color],[Size],[Price],[Discount],[Qty],[DiscountType],[PromotionCode],[Amnt],[OPrice],[OAmnt],[SaleType],[Line],[Change],[Brand],[Cate],[Ptype],[DMark],[Commision],[PromotionID],[DiscountID],[DiscountBrandBit],[DiscountPtyp],[GPrice],[LostSales],[CumulateValue],[VoucherID],[BrandBit],[SupplierID],[PantsLength],[Calced],[Message],[IsEshop],[Salm]
+          ([InputTime],[seqn],[ItemType],[Sku],[StyleCode],[Color],[Size],[Price],[Discount],[Qty],[DiscountType],[PromotionCode],[Amnt],[OPrice],[OAmnt],[SaleType],[Line],[Change],[Brand],[Cate],[Ptype],[DMark],[Commision],[PromotionID],[DiscountID],[DiscountBrandBit],[DiscountPtyp],[GPrice],[LostSales],[CumulateValue],[VoucherID],[BrandBit],[SupplierID],[PantsLength],[Calced],[Message],[IsEshop],[Salm],[Weight])
+   SELECT [InputTime],[seqn],[ItemType],[Sku],[StyleCode],[Color],[Size],[Price],[Discount],[Qty],[DiscountType],[PromotionCode],[Amnt],[OPrice],[OAmnt],[SaleType],[Line],[Change],[Brand],[Cate],[Ptype],[DMark],[Commision],[PromotionID],[DiscountID],[DiscountBrandBit],[DiscountPtyp],[GPrice],[LostSales],[CumulateValue],[VoucherID],[BrandBit],[SupplierID],[PantsLength],[Calced],[Message],[IsEshop],[Salm],[Weight]
 
 
    FROM   crcart
@@ -537,12 +540,13 @@ AS
    WHERE  a.PromotionID = b.phtxnt
 
    UPDATE a
-   SET    a.StyleLocalDescription = b.smldes
+   SET    a.StyleLocalDescription = b.smldes,
+   a.IsWeight = (CASE WHEN b.smcore='W' THEN 1 ELSE 0 end)
    FROM   #crcart a,
           mfstyl(NOLOCK) b
    WHERE  a.StyleCode = b.smcode
 
    SELECT *
-   FROM   #crcart 
+   FROM   #crcart
  
  
