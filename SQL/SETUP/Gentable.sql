@@ -313,6 +313,7 @@ CREATE TABLE dbo.crcart
    [Message]        nvarchar( 100 ) DEFAULT '',
    IsEshop          CHAR( 1 ) DEFAULT '',
    Salm             varchar( 20 ),
+   [Weight]         MONEY ,
    PRIMARY KEY CLUSTERED(TransDate, Shop, Crid, CartID, Seqn)
 )
 
