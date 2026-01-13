@@ -27,13 +27,12 @@ def api_sync_get_sales(
 @sync_router.get("/get-sales-list")
 def api_sync_get_sales_list(
     shopID: str = Query(..., description="店铺代码（varchar(5)）"),
-    trandate: str = Query(..., description="交易日期（smalldatetime，ISO 字符串）"),
-    Crid: str = Query(..., description="收银机号（char(3)）"),
-    invoiceID: int = Query(..., description="发票编号（int）"),
+    fromDate: str = Query(..., description="开始日期（smalldatetime，ISO 字符串）"),
+    toDate: str = Query(..., description="结束日期（smalldatetime，ISO 字符串）"),
 ):
     try:
-        data = SyncGetSalesList(shopID, trandate, Crid, invoiceID)
-        count = sum(len(v) for v in data.values()) if isinstance(data, dict) else 0
+        data = SyncGetSalesList(shopID, fromDate, toDate)
+        count = len(data) if isinstance(data, (list, tuple)) else 0
         return {"success": True, "count": count, "data": data}
     except Exception as e:
         return {"success": False, "message": str(e), "data": None}
