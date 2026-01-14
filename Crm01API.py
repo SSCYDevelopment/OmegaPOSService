@@ -5,7 +5,7 @@ from typing import Union
 from fastapi import APIRouter, Query
 from db import CreateNewInvoid, ListDiscount, SaveProperty, SubmitPayment, GetCouponTypes, DeleteCartItem, GetCartItems, SaveCartItem, SaveCartPayment, SaveCartMemberCard
 from db import SaveDiscountTicket, SaveCartInfo, RemoveDiscountTicket, GetPaymentType, GetSuspend, CleanCart, CleanCartPayment, InsertInvoiceProperty, DeleteInvoiceProperty
-from db import GetShift, NewInvo, GetInvoiceByIden, GetReceiptData, GetMemberTypies, SaveCartSuspendNum, UpdateCartItem
+from db import GetShift, NewInvo, GetInvoiceByIden, GetReceiptData, GetMemberTypies, SaveCartSuspendNum, UpdateCartItem, SaveMemberCardInfo
 from GBAPI import find_member_info_brand, points_query, query_xfk_info, query_by_tmq
 
 
@@ -658,5 +658,12 @@ def api_get_receipt_data(
     return data
 
 
-
-
+## 保存会员卡信息（调用存储过程 MPos_Crm01_SaveMemberCard）
+@crm01_router.get("/save-membercard-info")
+def api_save_membercard_info(
+    MemberType: str = Query(..., description="会员卡类型"),
+    MemberCard: str = Query(..., description="会员卡号"),
+    MemberLevel: str = Query('', description=""),
+):
+    result = SaveMemberCardInfo(MemberType, MemberCard, MemberLevel)
+    return {"success": True, "result": result}

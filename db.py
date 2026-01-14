@@ -254,15 +254,7 @@ def SaveCartItem(
         raise e
 
 
-def UpdateCartItem(
-    TransDate: str,
-    Shop: str,
-    Crid: str,
-    CartID: str,
-    Seqn: int,
-    qty: int,
-    Salm:str = '',
-):
+def UpdateCartItem(TransDate: str, Shop: str, Crid: str, CartID: str, Seqn: int, qty: int, Salm:str = ''):
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -272,15 +264,7 @@ def UpdateCartItem(
             ", ".join(["?" for _ in range(7)])
         )
 
-        params = (
-            TransDate,
-            Shop,
-            Crid,
-            CartID,
-            Seqn,
-            qty,
-            Salm,
-        )
+        params = (TransDate, Shop, Crid, CartID, Seqn, qty, Salm)
 
         try:
             cursor.execute(sql, params)
@@ -1456,3 +1440,27 @@ def SaveCartSuspendNum(TransDate, Shop, Crid, CartID, SuspendNum):
         raise e
     
     
+def SaveMemberCardInfo(MemberType: str, MemberCard: str, MemberLevel: str):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_Crm01_SaveMemberCard ?,?,?"
+
+        params = (MemberType, MemberCard, MemberLevel)
+
+        try:
+            cursor.execute(sql, params)
+            conn.commit()
+        except Exception as sql_ex:
+            logging.error(f"SQL Execute Error: {sql} | Params: {params} | Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        cursor.close()
+        conn.close()
+
+        return True
+
+    except Exception as e:
+        raise e
+
