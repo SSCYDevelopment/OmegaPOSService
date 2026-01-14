@@ -255,4 +255,9 @@ go
 INSERT syshop (syshop) VALUES ('GZ86')
 
 GO
-select * from crregn
+SELECT * FROM crregn
+insert crregn(cnregn,cndesc,cnauto,cnsvip,cnperv,cnlocl,cnbran,cnprop)VALUES('GBM','广百会员','Y','N',365,'Y',0,5)
+GO
+SELECT * FROM crlevl
+INSERT crlevl(lvregn, lvlevl,lvldes,lvdsct, lvamnt,lvbdst,lvocpy)VALUES('GBM','001','普通会员',5,0,0,0)
+go

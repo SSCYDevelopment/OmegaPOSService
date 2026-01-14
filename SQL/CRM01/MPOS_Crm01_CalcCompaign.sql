@@ -6,7 +6,8 @@ CREATE PROCEDURE MPOS_Crm01_CalcCompaign
    @crid            char(3),
    @cartID          uniqueidentifier,
    @memberCard      char(10) = '',
-   @debug           char(1) = 'N'
+   @debug           char(1) = 'N',
+   @usePromotion    char(1) = 'Y'
 AS
    DECLARE @memberRegion char(3)
 
@@ -23,7 +24,8 @@ AS
       END
 
    IF @memberCard IS NULL
-      SET @memberCard = ''
+      select @memberCard = a.wwscard from crcarh a 
+      WHERE TransDate=@transactionDate AND Shop=@shopID AND Crid=@crid AND CartID=@cartID
 
    DECLARE @memberCustID char(10)
 
@@ -31,6 +33,13 @@ AS
       SELECT @memberCustID = cdcust
       FROM   cccard(NOLOCK)
       WHERE  cdcard = @memberCard
+
+         
+   declare @memberCardDiscount money
+
+   select @memberCardDiscount = b.lvdsct from cccard a, crlevl b where cdcard=@memberCard and a.cdlevl=b.lvlevl and a.cdregn=b.lvregn
+
+   
 
    IF @memberCustID IS NULL
       SET @memberCustID = ''
@@ -76,8 +85,6 @@ AS
       [Size]                  char( 3 ),
       [Price]                 money,
       [Discount]              money,
-
-
       [Qty]                   int,
       [DiscountType]          char( 1 ),
       [PromotionCode]         varchar( 12 ),
@@ -394,7 +401,7 @@ AS
 
                            UPDATE @Items
                            SET    Itnpri = (CASE
-                                               WHEN Itudsc <> 0 THEN Itnpri * (100 - Itudsc) / 100
+                                               WHEN Itudsc <> 0 THEN Itpric * (100 - Itudsc) / 100
 
 
                                                ELSE Itupri
@@ -464,8 +471,6 @@ AS
 
    UPDATE a
    SET    a.InputTime = b.InputTime,
-
-
           a.StyleCode = b.StyleCode,
           a.Color = b.Color,
           a.Size = b.Size,
@@ -515,6 +520,38 @@ AS
    WHERE  Change <> 'Y' AND
           PromotionID <> ''
 
+
+   UPDATE #crcart
+   SET    Price = Oprice * ((100 - @memberCardDiscount)/100),
+          Amnt = (Oprice * ((100 - @memberCardDiscount)/100)) * Qty,
+          PromotionDescription = PromotionDescription + ' 会员折扣' ,
+          Discount = @memberCardDiscount,
+          DiscountID = '',
+          DiscountType = '',
+          DiscountPtyp = ''
+   WHERE  Change <> 'Y' AND
+          PromotionID = '' AND
+          price > Oprice * ((100 - @memberCardDiscount)/100)
+
+   declare @ticketDiscount money
+
+   select @ticketDiscount = dddsct from crdtik(nolock) a where a.ddtxdt=@transactionDate AND a.ddshop=@shopID AND a.ddcrid=@crid AND a.ddcart=@cartID
+
+   if @ticketDiscount> @memberCardDiscount
+      UPDATE #crcart
+      SET    Price = Oprice * ((100 - @ticketDiscount)/100),
+            Amnt = (Oprice * ((100 - @ticketDiscount)/100)) * Qty,
+            PromotionDescription = PromotionDescription + ' 电子优惠券折扣' ,
+            Discount = @ticketDiscount,
+            DiscountID = '',
+            DiscountType = '',
+            DiscountPtyp = ''
+      WHERE  Change <> 'Y' AND
+            PromotionID = '' AND
+            price > Oprice * ((100 - @ticketDiscount)/100)
+
+
+
    INSERT #crcart
           ([InputTime],[seqn],[ItemType],[Sku],[StyleCode],[Color],[Size],[Price],[Discount],[Qty],[DiscountType],[PromotionCode],[Amnt],[OPrice],[OAmnt],[SaleType],[Line],[Change],[Brand],[Cate],[Ptype],[DMark],[Commision],[PromotionID],[DiscountID],[DiscountBrandBit],[DiscountPtyp],[GPrice],[LostSales],[CumulateValue],[VoucherID],[BrandBit],[SupplierID],[PantsLength],[Calced],[Message],[IsEshop],[Salm],[Weight])
    SELECT [InputTime],[seqn],[ItemType],[Sku],[StyleCode],[Color],[Size],[Price],[Discount],[Qty],[DiscountType],[PromotionCode],[Amnt],[OPrice],[OAmnt],[SaleType],[Line],[Change],[Brand],[Cate],[Ptype],[DMark],[Commision],[PromotionID],[DiscountID],[DiscountBrandBit],[DiscountPtyp],[GPrice],[LostSales],[CumulateValue],[VoucherID],[BrandBit],[SupplierID],[PantsLength],[Calced],[Message],[IsEshop],[Salm],[Weight]
@@ -550,3 +587,5 @@ AS
    FROM   #crcart
  
  
+go
+

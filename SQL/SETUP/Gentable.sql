@@ -933,8 +933,7 @@ create table cccard (cdcard char(10),
                      cdregn char(3),
                      cdlevl char(3),
                      cdcanx char(1)
-                     Primary Key Clustered(cdcard),
-                     Foreign Key (cdcust) References cccust(cmcust),
+                     Primary Key Clustered(cdcard, cdregn),
                      Foreign Key (cdregn,cdlevl) References crlevl(lvregn,lvlevl)
                     )
 Go
