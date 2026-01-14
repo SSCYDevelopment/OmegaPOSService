@@ -10,6 +10,8 @@ CREATE PROCEDURE MPos_Crm01_Update @shopID CHAR(5),
        @redeemAmount MONEY = 0, --预留
        @redeemQuantity SMALLINT = 0 --预留
 AS
+SET NOCOUNT ON;
+
 DECLARE @lmCamt MONEY
 DECLARE @lmIamt MONEY --货品总金额
 DECLARE @lnShft INT

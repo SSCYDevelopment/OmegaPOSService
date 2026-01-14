@@ -1217,6 +1217,41 @@ def SubmitPayment(transDate: date, shopid: str, crid: str, cartID: str, invoiceI
             conn.close()
 
 
+def UpdateInvoice(transDate: date, shopid: str, crid: str, invoiceID:int, discountAmount:float):
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        sql = "EXEC MPos_Crm01_Update ?, ?, ?, ?, ?"
+
+        try:
+            cursor.execute(sql, (shopid, transDate, crid, invoiceID, discountAmount))
+        except Exception as sql_ex:
+            conn.rollback()
+            logging.error(f"SQL Execute Error: {sql} | Params: {transDate}, {crid}, {invoiceID}| Error: {str(sql_ex)}")
+            raise Exception("SQL 执行错误，请联系系统管理员")
+
+        row = cursor.fetchone()
+
+        if row:
+            conn.commit()
+            return {'ReturnID': row[0], 'ReturnMessage':''}
+        else:
+            conn.rollback()
+            return {'ReturnID': 0, 'ReturnMessage':f'脚本返回解析失败：{row}'}
+
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 def SaveProperty(transDate: date, shopid: str, crid: str, invoiceID:int, propKey:str, propValue:str):
     """
     生成发票号

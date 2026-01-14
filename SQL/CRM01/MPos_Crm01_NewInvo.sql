@@ -8,6 +8,8 @@ CREATE PROCEDURE MPos_Crm01_NewInvo
    @PCCRID   char(3),
    @PNewInvo int = NULL OUTPUT -- 新增可选输出参数，默认 NULL
 AS
+   SET nocount ON
+
    DECLARE @lnInvo int
 
    DECLARE @lnShft int
@@ -24,8 +26,6 @@ AS
    (
       tshft int NULL
    )
-
-   SET nocount ON
 
    SELECT @lnShft = dhshft
    FROM   crcdwh(nolock)
@@ -71,14 +71,14 @@ AS
                          shinvo = @lnInvo )
       SELECT @lnInvo = @lnInvo + 1
 
-   IF @PNewInvo IS NOT NULL  OR
-      @@NESTLEVEL > 1
+   IF @PNewInvo IS NOT NULL 
+   --OR @@NESTLEVEL > 1
       BEGIN
-         -- 如果外部传入了变量接收，或者处于嵌套调用中
+         -- 如果外部传入了变量接收
          SET @PNewInvo = @lnInvo;
 
          RETURN;
       END
 
-   SELECT @lnInvo 
+   SELECT @lnInvo
  

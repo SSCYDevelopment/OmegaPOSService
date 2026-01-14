@@ -5,7 +5,7 @@ from typing import Union
 from fastapi import APIRouter, Query
 from db import CreateNewInvoid, ListDiscount, SaveProperty, SubmitPayment, GetCouponTypes, DeleteCartItem, GetCartItems, SaveCartItem, SaveCartPayment, SaveCartMemberCard
 from db import SaveDiscountTicket, SaveCartInfo, RemoveDiscountTicket, GetPaymentType, GetSuspend, CleanCart, CleanCartPayment, InsertInvoiceProperty, DeleteInvoiceProperty
-from db import GetShift, NewInvo, GetInvoiceByIden, GetReceiptData, GetMemberTypies, SaveCartSuspendNum, UpdateCartItem, SaveMemberCardInfo
+from db import GetShift, NewInvo, GetInvoiceByIden, GetReceiptData, GetMemberTypies, SaveCartSuspendNum, UpdateCartItem, SaveMemberCardInfo, UpdateInvoice
 from GBAPI import find_member_info_brand, points_query, query_xfk_info, query_by_tmq
 
 
@@ -598,7 +598,11 @@ def api_submit_payment(
     # 解析结果
     if result['ReturnID']:
         if result['ReturnID'] == 1:
-            return {"success": True, "result": result["ReturnMessage"]}
+            updateRes = UpdateInvoice(TransDate, Shopid, Crid, InvoiceID, 0)
+            if updateRes['ReturnID'] == 1:
+                return {"success": True, "result": '提交成功'}
+            else:
+                return {"success": False, "result": '更新发票状态失败'}
         else:
             return {"success": False, "result": f'提交失败：{result["ReturnMessage"]}'}
     else:
