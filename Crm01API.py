@@ -5,7 +5,7 @@ from typing import Union
 from fastapi import APIRouter, Query
 from db import CreateNewInvoid, ListDiscount, SaveProperty, SubmitPayment, GetCouponTypes, DeleteCartItem, GetCartItems, SaveCartItem, SaveCartPayment, SaveCartMemberCard
 from db import SaveDiscountTicket, SaveCartInfo, RemoveDiscountTicket, GetPaymentType, GetSuspend, CleanCart, CleanCartPayment, InsertInvoiceProperty, DeleteInvoiceProperty
-from db import GetShift, NewInvo, GetInvoiceByIden, GetReceiptData, GetMemberTypies, SaveCartSuspendNum
+from db import GetShift, NewInvo, GetInvoiceByIden, GetReceiptData, GetMemberTypies, SaveCartSuspendNum, UpdateCartItem, SaveMemberCardInfo
 from GBAPI import find_member_info_brand, points_query, query_xfk_info, query_by_tmq
 
 
@@ -340,6 +340,30 @@ def api_save_cart_item(
     return {"success": True, "result": result}
 
 
+##保存/更新购物车项目（调用存储过程）
+@crm01_router.get("/update-cart-item")
+def api_update_cart_item(
+    TransDate: str = Query(..., description="交易日期（smalldatetime），建议 ISO 格式，例如 2025-12-01 或 2025-12-01 14:30:00"),
+    Shop: str = Query(..., description="店铺代码（char(5)），5 字符店铺编号"),
+    Crid: str = Query(..., description="收银机号（char(3)），3 字符收银机/柜台编号"),
+    CartID: str = Query(..., description="购物车 ID（uniqueidentifier），UUID 字符串，例如 11111111-1111-1111-1111-111111111111"),
+    Seqn: int = Query(..., description="购物车商品序号（int），传 -1 表示让存储过程自动分配新的序号"),
+    qty: int = Query(..., description="数量（int），当前行项的商品数量"),
+    Salm : str = Query("", description="销售人员"),
+):
+    result = UpdateCartItem(
+        TransDate,
+        Shop,
+        Crid,
+        CartID,
+        Seqn,
+        qty,
+        Salm,
+    )
+
+    return {"success": True, "result": result}
+
+
 ## 保存/更新购物车头信息（调用存储过程 MPos_Crm01_SaveCartInfo）
 @crm01_router.get("/save-cart-info")
 def api_save_cart_info(
@@ -634,5 +658,12 @@ def api_get_receipt_data(
     return data
 
 
-
-
+## 保存会员卡信息（调用存储过程 MPos_Crm01_SaveMemberCard）
+@crm01_router.get("/save-membercard-info")
+def api_save_membercard_info(
+    MemberType: str = Query(..., description="会员卡类型"),
+    MemberCard: str = Query(..., description="会员卡号"),
+    MemberLevel: str = Query('', description=""),
+):
+    result = SaveMemberCardInfo(MemberType, MemberCard, MemberLevel)
+    return {"success": True, "result": result}
