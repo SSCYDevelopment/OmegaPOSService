@@ -39,7 +39,8 @@ AS
 
    select @memberCardDiscount = b.lvdsct from cccard a, crlevl b where cdcard=@memberCard and a.cdlevl=b.lvlevl and a.cdregn=b.lvregn
 
-   
+   if @memberCardDiscount is NULL
+      set @memberCardDiscount=0   
 
    IF @memberCustID IS NULL
       SET @memberCustID = ''
@@ -209,6 +210,9 @@ AS
                        FROM   crpmct(NOLOCK)
                        WHERE  pcpomo = phtxnt AND
                               pccust = @memberCustID )
+
+   if @usePromotion='N'
+      DELETE FROM #tpomh                              
 
    IF (@debug = 'Y')
       SELECT tphtxnt
@@ -537,6 +541,13 @@ AS
 
    select @ticketDiscount = dddsct from crdtik(nolock) a where a.ddtxdt=@transactionDate AND a.ddshop=@shopID AND a.ddcrid=@crid AND a.ddcart=@cartID
 
+   print 'memberCardDiscount:'
+   print @memberCardDiscount
+
+   print 'ticketDiscount:'
+   print @ticketDiscount
+   
+   
    if @ticketDiscount> @memberCardDiscount
       UPDATE #crcart
       SET    Price = Oprice * ((100 - @ticketDiscount)/100),
