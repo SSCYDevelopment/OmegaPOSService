@@ -13,7 +13,9 @@ AS
 SET NOCOUNT ON;
 
 DECLARE @lmCamt MONEY
+
 DECLARE @lmIamt MONEY --货品总金额
+declare @lmIamt_weight MONEY --货品总金额(称重)
 DECLARE @lnShft INT
 DECLARE @lcMakt CHAR(2)
 DECLARE @lnVatr DECIMAL(5, 2)
@@ -83,6 +85,26 @@ WHERE sdshop = @shopID
        AND sdtxdt = @TransDate
        AND sdcrid = @crid
        AND sdinvo = @invoiceID
+       and isnull(sdwght,0)=0
+
+SELECT @lmIamt_weight = sum(CASE 
+                     WHEN sdtype = 'S'
+                            THEN sdsprc * sdwght - sddsct
+                     ELSE sddsct - sdwght * sdsprc
+                     END)
+FROM crsald
+WHERE sdshop = @shopID
+       AND sdtxdt = @TransDate
+       AND sdcrid = @crid
+       AND sdinvo = @invoiceID and isnull(sdwght,0)>0       
+
+if @lmIamt is null
+       set @lmIamt=0
+
+if @lmIamt_weight IS NULL
+       set @lmIamt_weight=0
+
+set @lmIamt = @lmIamt + @lmIamt_weight       
 
 --获取支付方式总金额
 SELECT @lmCamt = sum(ctlamt)
@@ -455,8 +477,7 @@ BEGIN
        END
 
        UPDATE crsalh
-       SET shtqty = @lnTqty,
-              shamnt = @lnTamt,
+       SET 
               shupdt = 'Y',
               shiden= @iden
        WHERE shtxdt = @TransDate

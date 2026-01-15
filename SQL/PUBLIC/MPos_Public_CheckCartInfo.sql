@@ -34,7 +34,8 @@ SELECT a.TransDate,
 	a.OAmnt,
 	a.Price,
 	a.Amnt,
-	b.smsprc
+	b.smsprc,
+	a.Weight
 FROM crcart a,
 	mfstyl b
 WHERE a.CartID = @CartID

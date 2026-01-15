@@ -127,7 +127,8 @@ AS
    SELECT Sku,a.StyleCode,Seqn,Oprice,Price,'','N',0,0,Qty,PType,StyleCode
    FROM   crcart(NOLOCK) a
    WHERE  CartID = @cartID AND
-          ItemType = 'S'
+          ItemType = 'S' AND
+          isnull(a.Weight,0) = 0
 
    ----计算promotion                                                                              
    DECLARE @phtxnt char(8)
@@ -525,6 +526,30 @@ AS
           PromotionID <> ''
 
 
+
+
+
+
+   INSERT #crcart
+          ([InputTime],[seqn],[ItemType],[Sku],[StyleCode],[Color],[Size],[Price],[Discount],[Qty],[DiscountType],[PromotionCode],[Amnt],[OPrice],[OAmnt],[SaleType],[Line],[Change],[Brand],[Cate],[Ptype],[DMark],[Commision],[PromotionID],[DiscountID],[DiscountBrandBit],[DiscountPtyp],[GPrice],[LostSales],[CumulateValue],[VoucherID],[BrandBit],[SupplierID],[PantsLength],[Calced],[Message],[IsEshop],[Salm],[Weight])
+   SELECT [InputTime],[seqn],[ItemType],[Sku],[StyleCode],[Color],[Size],[Price],[Discount],[Qty],[DiscountType],[PromotionCode],[Amnt],[OPrice],[OAmnt],[SaleType],[Line],[Change],[Brand],[Cate],[Ptype],[DMark],[Commision],[PromotionID],[DiscountID],[DiscountBrandBit],[DiscountPtyp],[GPrice],[LostSales],[CumulateValue],[VoucherID],[BrandBit],[SupplierID],[PantsLength],[Calced],[Message],[IsEshop],[Salm],[Weight]
+   FROM   crcart
+   WHERE  TransDate = @transactionDate AND
+          Shop = @shopID AND
+          crid = @crid AND
+          CartID = @cartID AND
+          ItemType <> 'S'
+
+   INSERT #crcart
+          ([InputTime],[seqn],[ItemType],[Sku],[StyleCode],[Color],[Size],[Price],[Discount],[Qty],[DiscountType],[PromotionCode],[Amnt],[OPrice],[OAmnt],[SaleType],[Line],[Change],[Brand],[Cate],[Ptype],[DMark],[Commision],[PromotionID],[DiscountID],[DiscountBrandBit],[DiscountPtyp],[GPrice],[LostSales],[CumulateValue],[VoucherID],[BrandBit],[SupplierID],[PantsLength],[Calced],[Message],[IsEshop],[Salm],[Weight])
+   SELECT [InputTime],[seqn],[ItemType],[Sku],[StyleCode],[Color],[Size],[Price],[Discount],[Qty],[DiscountType],[PromotionCode],[Amnt],[OPrice],[OAmnt],[SaleType],[Line],[Change],[Brand],[Cate],[Ptype],[DMark],[Commision],[PromotionID],[DiscountID],[DiscountBrandBit],[DiscountPtyp],[GPrice],[LostSales],[CumulateValue],[VoucherID],[BrandBit],[SupplierID],[PantsLength],[Calced],[Message],[IsEshop],[Salm],[Weight]
+   FROM   crcart
+   WHERE  TransDate = @transactionDate AND
+          Shop = @shopID AND
+          crid = @crid AND
+          CartID = @cartID AND
+          ItemType = 'S' and isnull(Weight,0)>0
+
    UPDATE #crcart
    SET    Price = Oprice * ((100 - @memberCardDiscount)/100),
           Amnt = (Oprice * ((100 - @memberCardDiscount)/100)) * Qty,
@@ -535,7 +560,26 @@ AS
           DiscountPtyp = ''
    WHERE  Change <> 'Y' AND
           PromotionID = '' AND
-          price > Oprice * ((100 - @memberCardDiscount)/100)
+          price > Oprice * ((100 - @memberCardDiscount)/100) AND
+          ItemType = 'S' and 
+          isnull(Weight,0)=0
+
+   UPDATE #crcart
+   SET    Price = Oprice * ((100 - @memberCardDiscount)/100),
+          Amnt = (Oprice * ((100 - @memberCardDiscount)/100)) * Weight,
+          PromotionDescription = PromotionDescription + ' 会员折扣' ,
+          Discount = @memberCardDiscount,
+          DiscountID = '',
+          DiscountType = '',
+          DiscountPtyp = ''
+   WHERE  Change <> 'Y' AND
+          PromotionID = '' AND
+          price > Oprice * ((100 - @memberCardDiscount)/100) AND
+          ItemType = 'S' and 
+          isnull(Weight,0) > 0
+
+
+
 
    declare @ticketDiscount money
 
@@ -549,31 +593,40 @@ AS
    
    
    if @ticketDiscount> @memberCardDiscount
-      UPDATE #crcart
-      SET    Price = Oprice * ((100 - @ticketDiscount)/100),
-            Amnt = (Oprice * ((100 - @ticketDiscount)/100)) * Qty,
-            PromotionDescription = PromotionDescription + ' 电子优惠券折扣' ,
-            Discount = @ticketDiscount,
-            DiscountID = '',
-            DiscountType = '',
-            DiscountPtyp = ''
-      WHERE  Change <> 'Y' AND
-            PromotionID = '' AND
-            price > Oprice * ((100 - @ticketDiscount)/100)
+      BEGIN
+         UPDATE #crcart
+         SET    Price = Oprice * ((100 - @ticketDiscount)/100),
+               Amnt = (Oprice * ((100 - @ticketDiscount)/100)) * Qty,
+               PromotionDescription = PromotionDescription + ' 电子优惠券折扣' ,
+               Discount = @ticketDiscount,
+               DiscountID = '',
+               DiscountType = '',
+               DiscountPtyp = ''
+         WHERE  Change <> 'Y' AND
+               PromotionID = '' AND
+               price > Oprice * ((100 - @ticketDiscount)/100) and 
+               ItemType = 'S' And 
+               isnull(Weight,0)=0
+
+         UPDATE #crcart
+         SET    Price = Oprice * ((100 - @ticketDiscount)/100),
+               Amnt = (Oprice * ((100 - @ticketDiscount)/100)) * Weight,
+               PromotionDescription = PromotionDescription + ' 电子优惠券折扣' ,
+               Discount = @ticketDiscount,
+               DiscountID = '',
+               DiscountType = '',
+               DiscountPtyp = ''
+         WHERE  Change <> 'Y' AND
+               PromotionID = '' AND
+               price > Oprice * ((100 - @ticketDiscount)/100) and 
+               ItemType = 'S' And 
+               isnull(Weight,0)>0
+
+
+      END
 
 
 
-   INSERT #crcart
-          ([InputTime],[seqn],[ItemType],[Sku],[StyleCode],[Color],[Size],[Price],[Discount],[Qty],[DiscountType],[PromotionCode],[Amnt],[OPrice],[OAmnt],[SaleType],[Line],[Change],[Brand],[Cate],[Ptype],[DMark],[Commision],[PromotionID],[DiscountID],[DiscountBrandBit],[DiscountPtyp],[GPrice],[LostSales],[CumulateValue],[VoucherID],[BrandBit],[SupplierID],[PantsLength],[Calced],[Message],[IsEshop],[Salm],[Weight])
-   SELECT [InputTime],[seqn],[ItemType],[Sku],[StyleCode],[Color],[Size],[Price],[Discount],[Qty],[DiscountType],[PromotionCode],[Amnt],[OPrice],[OAmnt],[SaleType],[Line],[Change],[Brand],[Cate],[Ptype],[DMark],[Commision],[PromotionID],[DiscountID],[DiscountBrandBit],[DiscountPtyp],[GPrice],[LostSales],[CumulateValue],[VoucherID],[BrandBit],[SupplierID],[PantsLength],[Calced],[Message],[IsEshop],[Salm],[Weight]
-
-
-   FROM   crcart
-   WHERE  TransDate = @transactionDate AND
-          Shop = @shopID AND
-          crid = @crid AND
-          CartID = @cartID AND
-          ItemType <> 'S'
 
    UPDATE #crcart
    SET    [TransDate] = @transactionDate,
@@ -595,7 +648,7 @@ AS
    WHERE  a.StyleCode = b.smcode
 
    SELECT *
-   FROM   #crcart
+   FROM   #crcart order by Seqn
  
  
 go

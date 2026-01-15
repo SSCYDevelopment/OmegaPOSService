@@ -100,3 +100,51 @@ EXEC MPos_Publi_CheckCartInfo @TransDate = '2025-12-17',
 	@Crid = '998',
 	@CartID = 'A4858BCB-F82B-4277-9605-1021C8DBAA71',
 	@usePromotion = 'N'
+
+
+EXEC MPos_Publi_CheckCartInfo @TransDate = '2026-1-15',
+	@Shop = 'GZ86',
+	@Crid = '998',
+	@CartID = 'cede7129-1403-4dfc-81a6-3884c9e7604c',
+	@usePromotion = 'N'
+
+
+EXEC MPos_Publi_CheckCartInfo @TransDate = '2026-1-15',
+	@Shop = 'GZ86',
+	@Crid = '998',
+	@CartID = '36cde003-a53c-4c26-81b2-6a48460018c7',
+	@usePromotion = 'Y'
+
+
+select * from crcart a where a.CartID='36cde003-a53c-4c26-81b2-6a48460018c7'
+update a set a.shupdt='' from crsalh a where a.shtxdt='2026-1-15' and a.shshop='GZ86' and a.shcrid='998' and a.shinvo=3
+select * from crcinv a where a.CartID='36cde003-a53c-4c26-81b2-6a48460018c7'
+
+select * from crsald a where a.sdtxdt='2026-1-15' and a.sdshop='GZ86' and a.sdcrid='998' and sdinvo=3
+select * from crsalh a where a.shtxdt='2026-1-15' and a.shshop='GZ86' and a.shcrid='998' and a.shinvo=3
+select * from crctdr a where a.cttxdt='2026-1-15' and a.ctshop='GZ86' and a.ctcrid='998' and a.ctinvo=3
+
+
+
+
+
+
+EXEC MPos_Crm01_SubmitInvoice @marketID = 'CN',
+	@operator = 'mikechan',
+	@tranDate = '2026-1-15',
+	@shopID = 'GZ86',
+	@crid = '998',
+	@invoiceID = 3,
+	@cartID = '36cde003-a53c-4c26-81b2-6a48460018c7',
+	@memberCard = '',
+	@memberCardType = '',
+	@salesAssociate = '',
+	@usePromotion = 'Y'
+
+
+
+EXEC MPos_Crm01_Update @shopID = 'GZ86',
+	@transDate = '2026-1-15',
+	@crid = '998',
+	@invoiceID = 3,
+	@discountAmount = 0
